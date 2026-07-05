@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{a2ea39bc-cbf5-432b-858e-8fc43d687c55}</ProjectGuid>
+    <RootNamespace>rbxexternal</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>Build\</OutDir>
+    <IntDir>Build\obj\</IntDir>
+    <IncludePath>src;src\Dependencies\ImGui;Dependencies\Clipper2Lib\include;Dependencies\FreeType\include;$(IncludePath)</IncludePath>
+    <TargetName>rbx-external</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>Build\</OutDir>
+    <IntDir>Build\obj\</IntDir>
+    <IncludePath>src;src\Dependencies\ImGui;Dependencies\Clipper2Lib\include;Dependencies\FreeType\include;$(IncludePath)</IncludePath>
+    <TargetName>rbx-external</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalDependencies>d3d11.lib;d3dcompiler.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>Dependencies\FreeType;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>/NODEFAULTLIB:LIBCMT %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalDependencies>d3d11.lib;d3dcompiler.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>Dependencies\FreeType;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="src\driver\driver.h" />
+    <ClInclude Include="src\engine\engine.h" />
+    <ClInclude Include="src\engine\math.h" />
+    <ClInclude Include="src\engine\offset.h" />
+    <ClInclude Include="src\global.h" />
+    <ClInclude Include="src\log.h" />
+    <ClInclude Include="src\config.h" />
+    <ClInclude Include="src\ui\graphic.h" />
+    <ClInclude Include="src\ui\notify.h" />
+    <ClInclude Include="src\ui\font\regular.h" />
+    <ClInclude Include="src\ui\font\bold.h" />
+    <ClInclude Include="src\ui\idalovesme\ida_assets.h" />
+    <ClInclude Include="src\feature\cache.h" />
+    <ClInclude Include="src\feature\esp.h" />
+    <ClInclude Include="src\feature\aim.h" />
+    <ClInclude Include="src\feature\wallcheck.h" />
+    <ClInclude Include="src\feature\phantom.h" />
+    <ClInclude Include="src\Dependencies\ImGui\imgui.h" />
+    <ClInclude Include="src\Dependencies\ImGui\imgui_internal.h" />
+    <ClInclude Include="src\Dependencies\ImGui\imconfig.h" />
+    <ClInclude Include="src\Dependencies\ImGui\misc\imgui_freetype.h" />
+    <ClInclude Include="src\Dependencies\ImGui\addons\imgui_addons.h" />
+    <ClInclude Include="src\Dependencies\ImGui\addons\Colors\Colors.h" />
+    <ClInclude Include="src\Dependencies\ImGui\imstb_rectpack.h" />
+    <ClInclude Include="src\Dependencies\ImGui\imstb_textedit.h" />
+    <ClInclude Include="src\Dependencies\ImGui\imstb_truetype.h" />
+    <ClInclude Include="src\Dependencies\ImGui\backends\imgui_impl_dx11.h" />
+    <ClInclude Include="src\Dependencies\ImGui\backends\imgui_impl_win32.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\driver\driver.cpp" />
+    <ClCompile Include="src\engine\actor.cpp" />
+    <ClCompile Include="src\engine\camera.cpp" />
+    <ClCompile Include="src\engine\human.cpp" />
+    <ClCompile Include="src\engine\instance.cpp" />
+    <ClCompile Include="src\engine\light.cpp" />
+    <ClCompile Include="src\engine\model.cpp" />
+    <ClCompile Include="src\engine\part.cpp" />
+    <ClCompile Include="src\engine\render.cpp" />
+    <ClCompile Include="src\engine\view.cpp" />
+    <ClCompile Include="src\feature\aim.cpp" />
+    <ClCompile Include="src\feature\cache.cpp" />
+    <ClCompile Include="src\feature\esp.cpp" />
+    <ClCompile Include="src\feature\wallcheck.cpp" />
+    <ClCompile Include="src\ui\graphic.cpp" />
+    <ClCompile Include="src\ui\idalovesme\ida_fonts.cpp" />
+    <ClCompile Include="src\ui\idalovesme\ida_textures.cpp" />
+    <ClCompile Include="src\Dependencies\ImGui\imgui.cpp" />
+    <ClCompile Include="src\Dependencies\ImGui\imgui_draw.cpp" />
+    <ClCompile Include="src\Dependencies\ImGui\imgui_tables.cpp" />
+    <ClCompile Include="src\Dependencies\ImGui\imgui_widgets.cpp" />
+    <ClCompile Include="src\Dependencies\ImGui\backends\imgui_impl_dx11.cpp" />
+    <ClCompile Include="src\Dependencies\ImGui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="src\Dependencies\ImGui\misc\imgui_freetype.cpp" />
+    <ClCompile Include="src\Dependencies\ImGui\addons\imgui_addons.cpp" />
+    <ClCompile Include="Dependencies\Clipper2Lib\src\clipper.engine.cpp" />
+    <ClCompile Include="Dependencies\Clipper2Lib\src\clipper.offset.cpp" />
+    <ClCompile Include="Dependencies\Clipper2Lib\src\clipper.rectclip.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="Dependencies\FreeType\freetype.lib" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
