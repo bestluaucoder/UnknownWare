@@ -12,7 +12,7 @@
 #include "engine/engine.h"
 #include "engine/math.h"
 #include "feature/wallcheck.h"
-#include "imgui/addons/imgui_addons.h"
+#include "addons/imgui_addons.h"
 
 std::uint64_t helper::CachedInputObject = 0;
 
@@ -90,16 +90,20 @@ static bool knocked(sdk::player& player)
         return false;
 
     sdk::instance BodyEffects = player.character.child("BodyEffects");
-    if (BodyEffects.Address == 0)
-        return false;
+    if (BodyEffects.Address)
+    {
+        sdk::instance Ko = BodyEffects.child("K.O");
+        if (Ko.Address)
+            return drive->read<bool>(Ko.Address + offset::misc::Value);
+    }
 
-    sdk::instance Ko = BodyEffects.child("K.O");
-    if (Ko.Address == 0)
-        return false;
+    if (player.humanoid.Address)
+    {
+        sdk::humanoid hum(player.humanoid.Address);
+        return hum.health() <= 0.f;
+    }
 
-    bool KoValue = drive->read<bool>(Ko.Address + offset::misc::Value);
-
-    return KoValue;
+    return false;
 }
 
 static bool alive(sdk::player& player)
@@ -776,4 +780,164 @@ void silent::run()
 {
     std::thread(frame).detach();
     std::thread(mouse).detach();
+    std::thread(magic_bullet).detach();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Magic Bullet — redirects Lua GC Ray userdatas toward the closest target.
+// Ported from pastebin.com/PiupZbgq — adapted to use the project's driver RPM/WPM.
+// ─────────────────────────────────────────────────────────────────────────────
+
+static bool mb_valid(uintptr_t addr) {
+    return addr > 0x10000 && addr < 0x7FFFFFFEFFFF;
+}
+
+// Find Lua global_State from ScriptContext by scanning for a valid page
+static uintptr_t mb_find_lua_global(uintptr_t sc) {
+    static uint8_t page_buf[33000];
+    // Scan offsets 200-2000 in 4-byte steps for a plausible Lua state pointer
+    for (int off = 200; off < 2000; off += 4) {
+        // Decrypt the stored pointer (Roblox XOR-encodes task pointers)
+        uint32_t lo = drive->read<uint32_t>(sc + off);
+        uint32_t hi = drive->read<uint32_t>(sc + off + 4);
+        uint32_t base32 = (uint32_t)((sc + off) & 0xFFFFFFFF);
+        uintptr_t L = ((uint64_t)(base32 - hi) << 32) | (uint64_t)(base32 - lo);
+
+        if (!mb_valid(L)) continue;
+
+        uintptr_t global = drive->read<uintptr_t>(L + 64);
+        if (!mb_valid(global)) continue;
+
+        uintptr_t page = drive->read<uintptr_t>(global + 792);
+        if (!mb_valid(page)) continue;
+
+        uint32_t page_size = drive->read<uint32_t>(page + 32);
+        if (page_size == 16360 || page_size == 32744 ||
+            (page_size > 200 && page_size < 100000))
+            return global;
+    }
+    return 0;
+}
+
+// Scan GC pages and redirect any Ray userdata toward target_pos
+static void mb_redirect_rays(uintptr_t global_state, const sdk::vector3& target) {
+    static uint8_t pbuf[33000];
+
+    // Read the Ray type tag from a known static address
+    uintptr_t base = drive->modulebase();
+    uint8_t ray_tag = (uint8_t)drive->read<uint32_t>(base + 0x7C790C0);
+    if (!ray_tag) return;
+
+    uintptr_t page = drive->read<uintptr_t>(global_state + 792);
+    int page_num = 0;
+
+    while (mb_valid(page) && page_num++ < 100000) {
+        uint32_t page_size  = drive->read<uint32_t>(page + 32);
+        uint32_t block_size = drive->read<uint32_t>(page + 36);
+
+        if (!block_size || block_size > 0x10000 ||
+            !page_size  || page_size  > sizeof(pbuf)) break;
+
+        ReadProcessMemory(drive->processhandle(), (LPCVOID)page, pbuf, page_size, nullptr);
+        int n = (page_size - 64) / block_size;
+
+        for (int i = 0; i < n; i++) {
+            uint8_t* blk = pbuf + 64 + i * block_size;
+            if (blk[0] != 9 || blk[3] != ray_tag) continue;
+
+            float* origin    = (float*)(blk + 16);
+            float* direction = (float*)(blk + 28);
+
+            float dir_len = sqrtf(direction[0]*direction[0] +
+                                  direction[1]*direction[1] +
+                                  direction[2]*direction[2]);
+            if (dir_len < 0.01f || fabsf(origin[0]) > 1e5f) continue;
+
+            float dx = target.x - origin[0];
+            float dy = target.y - origin[1];
+            float dz = target.z - origin[2];
+            float dist = sqrtf(dx*dx + dy*dy + dz*dz);
+            if (dist < 0.1f) continue;
+
+            float new_dir[3] = {
+                (dx / dist) * dir_len,
+                (dy / dist) * dir_len,
+                (dz / dist) * dir_len
+            };
+
+            uintptr_t addr = page + 64 + (uintptr_t)i * block_size;
+            drive->write<float>(addr + 28,      new_dir[0]);
+            drive->write<float>(addr + 28 + 4,  new_dir[1]);
+            drive->write<float>(addr + 28 + 8,  new_dir[2]);
+        }
+
+        page = drive->read<uintptr_t>(page + 8);
+    }
+}
+
+void silent::magic_bullet()
+{
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+
+    for (;;) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        if (!global::silent::MagicBullet) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+
+        if (!global::model.Address) continue;
+
+        // Get ScriptContext
+        sdk::instance sc = global::model.childclass("ScriptContext");
+        if (!sc.Address) continue;
+
+        // Find Lua global_State
+        static uintptr_t cached_global = 0;
+        static ULONGLONG last_global_find = 0;
+        ULONGLONG now = GetTickCount64();
+        if (!cached_global || now - last_global_find > 5000) {
+            cached_global    = mb_find_lua_global(sc.Address);
+            last_global_find = now;
+        }
+        if (!cached_global) continue;
+
+        // Get closest enemy position
+        sdk::vector3 target_pos{};
+        bool found = false;
+        float best_dist = FLT_MAX;
+
+        auto players = cache::snapshot();
+        for (auto& p : players) {
+            if (p.Local_Player || !p.character.Address) continue;
+            if (p.Health <= 0.f) continue;
+            if (!global::LocalPlayer.character.Address) continue;
+            if (p.character.Address == global::LocalPlayer.character.Address) continue;
+
+            sdk::instance part_inst = p.Head.Address ? p.Head : p.HumanoidRootPart;
+            if (!part_inst.Address) continue;
+
+            sdk::part part(part_inst.Address);
+            sdk::part prim = part.primitive();
+            if (!prim.Address) continue;
+
+            sdk::vector3 pos = prim.position();
+            if (std::isnan(pos.x)) continue;
+
+            sdk::vector3 cam_pos = global::camera.Address ?
+                global::camera.position() : sdk::vector3{};
+
+            float d = cam_pos.distance(pos);
+            if (d < best_dist) {
+                best_dist  = d;
+                target_pos = pos;
+                found = true;
+            }
+        }
+
+        if (!found) continue;
+
+        mb_redirect_rays(cached_global, target_pos);
+    }
 }

@@ -198,6 +198,7 @@ namespace config
 
         writeb("Settings", "Team_Check", global::setting::Team_Check, path);
         writeb("Settings", "Client_Check", global::setting::Client_Check, path);
+        writeb("Settings", "BotCheck", global::setting::BotCheck, path);
         writeb("Settings", "Streamproof", global::setting::Streamproof, path);
         writei("Settings", "Performance_Mode", global::setting::Performance_Mode, path);
         writeb("Settings", "Compact_UI", global::setting::Compact_UI, path);
@@ -211,11 +212,18 @@ namespace config
         writeb("Overlay", "Watermark", global::overlay::watermark, path);
         writeb("Overlay", "Hotkeys", global::overlay::hotkey, path);
         writeb("Overlay", "DamageLogs", global::overlay::DamageLogs, path);
+        writeb("Overlay", "Notifications", global::overlay::Notifications, path);
+        writeb("Overlay", "ShowKeybinds", global::overlay::ShowKeybinds, path);
         writef("Overlay", "Watermark_X", global::overlay::Watermark_Pos.x, path);
         writef("Overlay", "Watermark_Y", global::overlay::Watermark_Pos.y, path);
         writef("Overlay", "Hotkeys_X", global::overlay::Hotkeys_Pos.x, path);
         writef("Overlay", "Hotkeys_Y", global::overlay::Hotkeys_Pos.y, path);
+        writef("Overlay", "NotifPanel_X", global::overlay::Notif_Pos.x, path);
+        writef("Overlay", "NotifPanel_Y", global::overlay::Notif_Pos.y, path);
+        writef("Overlay", "MediaTracker_X", global::overlay::Media_Pos.x, path);
+        writef("Overlay", "MediaTracker_Y", global::overlay::Media_Pos.y, path);
         writef("Overlay", "AimView_MaxLength", global::overlay::AimView_MaxLength, path);
+        writef("Overlay", "Spotify", global::overlay::Spotify, path);
         writec("Overlay", "Hud_Accent", global::overlay::color::Accent, path);
         writec("Overlay", "Hud_Accent2", global::overlay::color::Accent2, path);
         writec("Overlay", "Hud_Panel", global::overlay::color::panel, path);
@@ -243,6 +251,100 @@ namespace config
         writeb("Triggerbot", "DistanceScale", global::aim::DistanceScale, path);
         writef("Triggerbot", "AutoHeadScale", global::aim::AutoHeadScale, path);
         writef("Triggerbot", "HitPart_Head_Scale", global::aim::HitPart_Head_Scale, path);
+
+        writeb("Aimbot", "Enabled", global::aimbot::Enabled, path);
+        writei("Aimbot", "Key", (int)global::aimbot::Key, path);
+        writei("Aimbot", "Mode", (int)global::aimbot::Mode, path);
+        writeb("Aimbot", "Legit", global::aimbot::Legit, path);
+        writef("Aimbot", "FOV", global::aimbot::FOV, path);
+        writef("Aimbot", "Smoothing", global::aimbot::Smoothing, path);
+        writef("Aimbot", "Speed", global::aimbot::Speed, path);
+        writei("Aimbot", "Hitbox", global::aimbot::Hitbox, path);
+        writeb("Aimbot", "VisibleCheck", global::aimbot::VisibleCheck, path);
+        writeb("Aimbot", "DeadCheck", global::aimbot::DeadCheck, path);
+        writeb("Aimbot", "TeamCheck", global::aimbot::TeamCheck, path);
+        writef("Aimbot", "Jitter", global::aimbot::Jitter, path);
+        writef("Aimbot", "RandomFOV", global::aimbot::RandomFOV, path);
+        writei("Aimbot", "TargetPriority", global::aimbot::TargetPriority, path);
+        writeb("Aimbot", "Prediction", global::aimbot::Prediction, path);
+        writeb("Aimbot", "AutoShoot", global::aimbot::AutoShoot, path);
+        writei("Aimbot", "ReactionMs", global::aimbot::ReactionMs, path);
+        writeb("Aimbot", "Sticky", global::aimbot::Sticky, path);
+        writeb("Aimbot", "AutoSens", global::aimbot::AutoSens, path);
+        writei("Aimbot", "SmoothEaseIn",  global::aimbot::SmoothEaseIn,  path);
+        writei("Aimbot", "SmoothEaseOut", global::aimbot::SmoothEaseOut, path);
+
+        // Misc
+        writeb("Misc", "Fly",         global::misc::fly,         path);
+        writei("Misc", "Fly_Key",     (int)global::misc::Fly_Key, path);
+        writei("Misc", "Fly_Mode",    (int)global::misc::Fly_Mode, path);
+        writef("Misc", "Fly_Speed",   global::misc::Fly_Speed,   path);
+        writeb("Misc", "Walkspeed",   global::misc::walkspeed,   path);
+        writef("Misc", "WS_Speed",    global::misc::Walkspeed_Speed, path);
+        writeb("Misc", "Hitbox",      global::misc::hitbox,      path);
+        writef("Misc", "Hitbox_X",    global::misc::Hitbox_Size_X, path);
+        writef("Misc", "Hitbox_Y",    global::misc::Hitbox_Size_Y, path);
+        writef("Misc", "Hitbox_Z",    global::misc::Hitbox_Size_Z, path);
+        writeb("Misc", "Desync",      global::misc::Desync,      path);
+        writei("Misc", "Desync_Key",  (int)global::misc::Desync_Key, path);
+        writei("Misc", "Desync_Mode", (int)global::misc::Desync_Mode, path);
+
+        writeb("Misc", "Tickrate",      global::misc::Tickrate,      path);
+        writei("Misc", "Tickrate_Key",  (int)global::misc::Tickrate_Key, path);
+        writei("Misc", "Tickrate_Mode", (int)global::misc::Tickrate_Mode, path);
+        writef("Misc", "Tickrate_Value",global::misc::Tickrate_Value, path);
+
+        writeb("Misc", "AnimChanger",   global::misc::AnimChanger,   path);
+        writei("Misc", "AnimKey",       (int)global::misc::AnimKey,  path);
+        writei("Misc", "AnimMode",      (int)global::misc::AnimMode, path);
+        writei("Misc", "AnimPack",      global::misc::AnimPack,      path);
+
+        writeb("Misc", "Lighting",      global::misc::Lighting,      path);
+        writeb("Misc", "ClockTime",     global::misc::ClockTime,     path);
+        writei("Misc", "ClockKey",      (int)global::misc::ClockKey, path);
+        writei("Misc", "ClockMode",     (int)global::misc::ClockMode,path);
+        writef("Misc", "ClockTimeValue",global::misc::ClockTimeValue,path);
+
+        // Crosshair
+        writeb("Crosshair", "Enabled",   global::crosshair::Enabled,   path);
+        writei("Crosshair", "Type",      global::crosshair::Type,      path);
+        writei("Crosshair", "Position",  global::crosshair::Position,  path);
+        writef("Crosshair", "Size",      global::crosshair::Size,      path);
+        writef("Crosshair", "Gap",       global::crosshair::Gap,       path);
+        writef("Crosshair", "Thickness", global::crosshair::Thickness, path);
+        writef("Crosshair", "SpinSpeed", global::crosshair::SpinSpeed, path);
+        writeb("Crosshair", "Outline",   global::crosshair::Outline,   path);
+        writec("Crosshair", "Color",     global::crosshair::Color,     path);
+
+        // Tracer
+        writeb("Tracer", "Enabled",   global::tracer::Enabled,   path);
+        writei("Tracer", "Style",     global::tracer::Style,     path);
+        writei("Tracer", "Origin",    global::tracer::Origin,    path);
+        writei("Tracer", "Dest",      global::tracer::Dest,      path);
+        writef("Tracer", "Thickness", global::tracer::Thickness, path);
+        writeb("Tracer", "Outline",   global::tracer::Outline,   path);
+        writec("Tracer", "Color",     global::tracer::Color,     path);
+
+        // Magic bullet
+        writeb("Silent", "MagicBullet", global::silent::MagicBullet, path);
+
+        // Silent aim settings
+        writeb("Silent", "Enabled",       global::silent::Enabled,       path);
+        writei("Silent", "Key",           (int)global::silent::Silent_Key, path);
+        writei("Silent", "Mode",          (int)global::silent::Silent_Mode, path);
+        writeb("Silent", "VisibleCheck",  global::silent::VisibleCheck,  path);
+        writeb("Silent", "KnockedCheck",  global::silent::KnockedCheck,  path);
+        writeb("Silent", "UseFov",        global::silent::UseFov,        path);
+        writef("Silent", "Fov",           global::silent::fov,           path);
+        writeb("Silent", "GunBasedFov",   global::silent::GunBasedFov,   path);
+        writei("Silent", "AimPart",       global::silent::AimPart,       path);
+        writei("Silent", "TargetPriority",global::silent::TargetPriority,path);
+        writeb("Silent", "StickyAim",     global::silent::StickyAim,     path);
+        writeb("Silent", "Prediction",    global::silent::Prediction,    path);
+        writeb("Silent", "AutoPrediction",global::silent::AutoPrediction,path);
+        writef("Silent", "PredX",         global::silent::PredictionX,   path);
+        writef("Silent", "PredY",         global::silent::PredictionY,   path);
+        writef("Silent", "PredZ",         global::silent::PredictionZ,   path);
         writef("Triggerbot", "HitPart_Torso_Scale", global::aim::HitPart_Torso_Scale, path);
         writef("Triggerbot", "HitPart_UpperTorso_Scale", global::aim::HitPart_UpperTorso_Scale, path);
         writef("Triggerbot", "HitPart_LowerTorso_Scale", global::aim::HitPart_LowerTorso_Scale, path);
@@ -270,6 +372,9 @@ namespace config
         writeb("Visuals", "Chinese_Hat", global::esp::Chinese_Hat, path);
         writeb("Visuals", "AimLine", global::esp::aimline, path);
         writeb("Visuals", "VisibleCheck", global::esp::VisibleCheck, path);
+        writeb("Visuals", "Dead_Check", global::esp::Dead_Check, path);
+        writeb("Visuals", "Local_Player", global::esp::Local_Player, path);
+        writeb("Visuals", "Limit_Distance", global::esp::Limit_Distance, path);
         writef("Visuals", "Render_Distance", global::esp::Render_Distance, path);
         writei("Visuals", "ChamsFadeSpeed", global::esp::ChamsFadeSpeed, path);
         writei("Visuals", "BoxFillSpeed", global::esp::BoxFillSpeed, path);
@@ -310,6 +415,7 @@ namespace config
 
         global::setting::Team_Check = readb("Settings", "Team_Check", global::setting::Team_Check, path);
         global::setting::Client_Check = readb("Settings", "Client_Check", global::setting::Client_Check, path);
+        global::setting::BotCheck = readb("Settings", "BotCheck", global::setting::BotCheck, path);
         global::setting::Streamproof = readb("Settings", "Streamproof", global::setting::Streamproof, path);
         global::setting::Performance_Mode = readi("Settings", "Performance_Mode", global::setting::Performance_Mode, path);
         global::setting::Compact_UI = readb("Settings", "Compact_UI", global::setting::Compact_UI, path);
@@ -325,12 +431,19 @@ namespace config
 
         global::overlay::watermark = readb("Overlay", "Watermark", global::overlay::watermark, path);
         global::overlay::hotkey = readb("Overlay", "Hotkeys", global::overlay::hotkey, path);
-        global::overlay::DamageLogs = readb("Overlay", "DamageLogs", global::overlay::DamageLogs, path);
+        global::overlay::DamageLogs    = readb("Overlay", "DamageLogs",    global::overlay::DamageLogs,    path);
+        global::overlay::Notifications = readb("Overlay", "Notifications", global::overlay::Notifications, path);
+        global::overlay::ShowKeybinds  = readb("Overlay", "ShowKeybinds",  global::overlay::ShowKeybinds,  path);
         global::overlay::Watermark_Pos.x = readf("Overlay", "Watermark_X", global::overlay::Watermark_Pos.x, path);
         global::overlay::Watermark_Pos.y = readf("Overlay", "Watermark_Y", global::overlay::Watermark_Pos.y, path);
         global::overlay::Hotkeys_Pos.x = readf("Overlay", "Hotkeys_X", global::overlay::Hotkeys_Pos.x, path);
         global::overlay::Hotkeys_Pos.y = readf("Overlay", "Hotkeys_Y", global::overlay::Hotkeys_Pos.y, path);
+        global::overlay::Notif_Pos.x   = readf("Overlay", "NotifPanel_X", global::overlay::Notif_Pos.x, path);
+        global::overlay::Notif_Pos.y   = readf("Overlay", "NotifPanel_Y", global::overlay::Notif_Pos.y, path);
+        global::overlay::Media_Pos.x   = readf("Overlay", "MediaTracker_X", global::overlay::Media_Pos.x, path);
+        global::overlay::Media_Pos.y   = readf("Overlay", "MediaTracker_Y", global::overlay::Media_Pos.y, path);
         global::overlay::AimView_MaxLength = readf("Overlay", "AimView_MaxLength", global::overlay::AimView_MaxLength, path);
+        global::overlay::Spotify = readf("Overlay", "Spotify", global::overlay::Spotify, path);
         readc("Overlay", "Hud_Accent", global::overlay::color::Accent, path);
         readc("Overlay", "Hud_Accent2", global::overlay::color::Accent2, path);
         readc("Overlay", "Hud_Panel", global::overlay::color::panel, path);
@@ -367,6 +480,94 @@ namespace config
         global::aim::HitPart_LeftLeg_Scale = readf("Triggerbot", "HitPart_LeftLeg_Scale", global::aim::HitPart_LeftLeg_Scale, path);
         global::aim::HitPart_RightLeg_Scale = readf("Triggerbot", "HitPart_RightLeg_Scale", global::aim::HitPart_RightLeg_Scale, path);
 
+        global::aimbot::Enabled = readb("Aimbot", "Enabled", global::aimbot::Enabled, path);
+        global::aimbot::Key = (ImGuiKey)readi("Aimbot", "Key", (int)global::aimbot::Key, path);
+        global::aimbot::Mode = (ImKeyBindMode)readi("Aimbot", "Mode", (int)global::aimbot::Mode, path);
+        global::aimbot::Legit = readb("Aimbot", "Legit", global::aimbot::Legit, path);
+        global::aimbot::FOV = readf("Aimbot", "FOV", global::aimbot::FOV, path);
+        global::aimbot::Smoothing = readf("Aimbot", "Smoothing", global::aimbot::Smoothing, path);
+        global::aimbot::Speed = readf("Aimbot", "Speed", global::aimbot::Speed, path);
+        global::aimbot::Hitbox = readi("Aimbot", "Hitbox", global::aimbot::Hitbox, path);
+        global::aimbot::VisibleCheck = readb("Aimbot", "VisibleCheck", global::aimbot::VisibleCheck, path);
+        global::aimbot::DeadCheck = readb("Aimbot", "DeadCheck", global::aimbot::DeadCheck, path);
+        global::aimbot::TeamCheck = readb("Aimbot", "TeamCheck", global::aimbot::TeamCheck, path);
+        global::aimbot::Jitter = readf("Aimbot", "Jitter", global::aimbot::Jitter, path);
+        global::aimbot::RandomFOV = readf("Aimbot", "RandomFOV", global::aimbot::RandomFOV, path);
+        global::aimbot::TargetPriority = readi("Aimbot", "TargetPriority", global::aimbot::TargetPriority, path);
+        global::aimbot::Prediction = readb("Aimbot", "Prediction", global::aimbot::Prediction, path);
+        global::aimbot::AutoShoot = readb("Aimbot", "AutoShoot", global::aimbot::AutoShoot, path);
+        global::aimbot::ReactionMs = readi("Aimbot", "ReactionMs", global::aimbot::ReactionMs, path);
+        global::aimbot::Sticky    = readb("Aimbot", "Sticky",   global::aimbot::Sticky,   path);
+        global::aimbot::AutoSens      = readb("Aimbot", "AutoSens",      global::aimbot::AutoSens,      path);
+        global::aimbot::SmoothEaseIn  = readi("Aimbot", "SmoothEaseIn",  global::aimbot::SmoothEaseIn,  path);
+        global::aimbot::SmoothEaseOut = readi("Aimbot", "SmoothEaseOut", global::aimbot::SmoothEaseOut, path);
+
+        global::misc::fly          = readb("Misc","Fly",        global::misc::fly,          path);
+        global::misc::Fly_Key      = (ImGuiKey)readi("Misc","Fly_Key", (int)global::misc::Fly_Key, path);
+        global::misc::Fly_Mode     = (ImKeyBindMode)readi("Misc","Fly_Mode",(int)global::misc::Fly_Mode,path);
+        global::misc::Fly_Speed    = readf("Misc","Fly_Speed",  global::misc::Fly_Speed,    path);
+        global::misc::walkspeed    = readb("Misc","Walkspeed",  global::misc::walkspeed,    path);
+        global::misc::Walkspeed_Speed = readf("Misc","WS_Speed",global::misc::Walkspeed_Speed,path);
+        global::misc::hitbox       = readb("Misc","Hitbox",     global::misc::hitbox,       path);
+        global::misc::Hitbox_Size_X= readf("Misc","Hitbox_X",  global::misc::Hitbox_Size_X,path);
+        global::misc::Hitbox_Size_Y= readf("Misc","Hitbox_Y",  global::misc::Hitbox_Size_Y,path);
+        global::misc::Hitbox_Size_Z= readf("Misc","Hitbox_Z",  global::misc::Hitbox_Size_Z,path);
+        global::misc::Desync       = readb("Misc","Desync",     global::misc::Desync,       path);
+        global::misc::Desync_Key   = (ImGuiKey)readi("Misc","Desync_Key",(int)global::misc::Desync_Key,path);
+        global::misc::Desync_Mode  = (ImKeyBindMode)readi("Misc","Desync_Mode",(int)global::misc::Desync_Mode,path);
+
+        global::misc::Tickrate       = readb("Misc","Tickrate",       global::misc::Tickrate,      path);
+        global::misc::Tickrate_Key   = (ImGuiKey)readi("Misc","Tickrate_Key",(int)global::misc::Tickrate_Key,path);
+        global::misc::Tickrate_Mode  = (ImKeyBindMode)readi("Misc","Tickrate_Mode",(int)global::misc::Tickrate_Mode,path);
+        global::misc::Tickrate_Value = readf("Misc","Tickrate_Value", global::misc::Tickrate_Value,path);
+
+        global::misc::AnimChanger = readb("Misc","AnimChanger", global::misc::AnimChanger,path);
+        global::misc::AnimKey     = (ImGuiKey)readi("Misc","AnimKey",(int)global::misc::AnimKey,path);
+        global::misc::AnimMode    = (ImKeyBindMode)readi("Misc","AnimMode",(int)global::misc::AnimMode,path);
+        global::misc::AnimPack    = readi("Misc","AnimPack",    global::misc::AnimPack,   path);
+
+        global::misc::Lighting      = readb("Misc","Lighting",      global::misc::Lighting,     path);
+        global::misc::ClockTime     = readb("Misc","ClockTime",     global::misc::ClockTime,    path);
+        global::misc::ClockKey      = (ImGuiKey)readi("Misc","ClockKey",(int)global::misc::ClockKey,path);
+        global::misc::ClockMode     = (ImKeyBindMode)readi("Misc","ClockMode",(int)global::misc::ClockMode,path);
+        global::misc::ClockTimeValue= readf("Misc","ClockTimeValue",global::misc::ClockTimeValue,path);
+
+        global::crosshair::Enabled   = readb("Crosshair","Enabled",  global::crosshair::Enabled,  path);
+        global::crosshair::Type      = readi("Crosshair","Type",     global::crosshair::Type,     path);
+        global::crosshair::Position  = readi("Crosshair","Position", global::crosshair::Position, path);
+        global::crosshair::Size      = readf("Crosshair","Size",     global::crosshair::Size,     path);
+        global::crosshair::Gap       = readf("Crosshair","Gap",      global::crosshair::Gap,      path);
+        global::crosshair::Thickness = readf("Crosshair","Thickness",global::crosshair::Thickness,path);
+        global::crosshair::SpinSpeed = readf("Crosshair","SpinSpeed",global::crosshair::SpinSpeed,path);
+        global::crosshair::Outline   = readb("Crosshair","Outline",  global::crosshair::Outline,  path);
+        readc("Crosshair","Color",     global::crosshair::Color, path);
+
+        global::tracer::Enabled   = readb("Tracer","Enabled",  global::tracer::Enabled,  path);
+        global::tracer::Style     = readi("Tracer","Style",    global::tracer::Style,    path);
+        global::tracer::Origin    = readi("Tracer","Origin",   global::tracer::Origin,   path);
+        global::tracer::Dest      = readi("Tracer","Dest",     global::tracer::Dest,     path);
+        global::tracer::Thickness = readf("Tracer","Thickness",global::tracer::Thickness,path);
+        global::tracer::Outline   = readb("Tracer","Outline",  global::tracer::Outline,  path);
+        readc("Tracer","Color",     global::tracer::Color, path);
+
+        global::silent::MagicBullet    = readb("Silent","MagicBullet",   global::silent::MagicBullet,   path);
+        global::silent::Enabled        = readb("Silent","Enabled",        global::silent::Enabled,        path);
+        global::silent::Silent_Key     = (ImGuiKey)readi("Silent","Key",  (int)global::silent::Silent_Key,path);
+        global::silent::Silent_Mode    = (ImKeyBindMode)readi("Silent","Mode",(int)global::silent::Silent_Mode,path);
+        global::silent::VisibleCheck   = readb("Silent","VisibleCheck",   global::silent::VisibleCheck,   path);
+        global::silent::KnockedCheck   = readb("Silent","KnockedCheck",   global::silent::KnockedCheck,   path);
+        global::silent::UseFov         = readb("Silent","UseFov",         global::silent::UseFov,         path);
+        global::silent::fov            = readf("Silent","Fov",            global::silent::fov,            path);
+        global::silent::GunBasedFov    = readb("Silent","GunBasedFov",    global::silent::GunBasedFov,    path);
+        global::silent::AimPart        = readi("Silent","AimPart",        global::silent::AimPart,        path);
+        global::silent::TargetPriority = readi("Silent","TargetPriority", global::silent::TargetPriority, path);
+        global::silent::StickyAim      = readb("Silent","StickyAim",      global::silent::StickyAim,      path);
+        global::silent::Prediction     = readb("Silent","Prediction",     global::silent::Prediction,     path);
+        global::silent::AutoPrediction = readb("Silent","AutoPrediction", global::silent::AutoPrediction, path);
+        global::silent::PredictionX    = readf("Silent","PredX",          global::silent::PredictionX,    path);
+        global::silent::PredictionY    = readf("Silent","PredY",          global::silent::PredictionY,    path);
+        global::silent::PredictionZ    = readf("Silent","PredZ",          global::silent::PredictionZ,    path);
+
         global::esp::Enabled = readb("Visuals", "Enabled", global::esp::Enabled, path);
         global::esp::Box = readb("Visuals", "Box", global::esp::Box, path);
         global::esp::Box_Fill = readb("Visuals", "Box_Fill", global::esp::Box_Fill, path);
@@ -385,6 +586,9 @@ namespace config
         global::esp::Chinese_Hat = readb("Visuals", "Chinese_Hat", global::esp::Chinese_Hat, path);
         global::esp::aimline = readb("Visuals", "AimLine", global::esp::aimline, path);
         global::esp::VisibleCheck = readb("Visuals", "VisibleCheck", global::esp::VisibleCheck, path);
+        global::esp::Dead_Check   = readb("Visuals", "Dead_Check",   global::esp::Dead_Check,   path);
+        global::esp::Local_Player = readb("Visuals", "Local_Player", global::esp::Local_Player, path);
+        global::esp::Limit_Distance = readb("Visuals", "Limit_Distance", global::esp::Limit_Distance, path);
         global::esp::Render_Distance = readf("Visuals", "Render_Distance", global::esp::Render_Distance, path);
         global::esp::ChamsFadeSpeed = readi("Visuals", "ChamsFadeSpeed", global::esp::ChamsFadeSpeed, path);
         global::esp::BoxFillSpeed = readi("Visuals", "BoxFillSpeed", global::esp::BoxFillSpeed, path);

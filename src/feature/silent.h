@@ -9,6 +9,7 @@ namespace silent
 {
     void frame();
     void mouse();
+    void magic_bullet();
     void run();
 }
 

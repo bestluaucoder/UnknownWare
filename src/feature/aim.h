@@ -3,5 +3,6 @@
 namespace aim {
 
 	void run();
+	void aimbot();
 
 }

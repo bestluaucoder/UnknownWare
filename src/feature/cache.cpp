@@ -14,6 +14,7 @@
 #include "feature/phantom.h"
 #include "feature/wallcheck.h"
 #include "ui/notify.h"
+#include "feature/game.h"
 namespace cache {
 
     struct partmap {
@@ -62,6 +63,92 @@ namespace cache {
     std::atomic<bool> References_Updated{ false };
     std::atomic<std::uint64_t> Current_GameID{ 0 };
     std::mutex Mutex;
+
+    // Adaptive pattern matching for custom body part names
+    bool matches_pattern(const std::string& name, const std::string& pattern) {
+        std::string lower_name = name;
+        std::string lower_pattern = pattern;
+        
+        // Convert to lowercase for case-insensitive comparison
+        for (auto& c : lower_name) c = std::tolower(c);
+        for (auto& c : lower_pattern) c = std::tolower(c);
+        
+        // Check if the name contains the pattern
+        return lower_name.find(lower_pattern) != std::string::npos;
+    }
+
+    sdk::instance sdk::player::* find_member_for_pattern(const std::string& name) {
+        // Pattern matching for common body part variations
+        if (matches_pattern(name, "humanoid") && !matches_pattern(name, "root")) {
+            return &sdk::player::humanoid;
+        }
+        if (matches_pattern(name, "humanoidrootpart") || matches_pattern(name, "hrp")) {
+            return &sdk::player::HumanoidRootPart;
+        }
+        if (matches_pattern(name, "head")) {
+            return &sdk::player::Head;
+        }
+        if (matches_pattern(name, "uppertorso")) {
+            return &sdk::player::UpperTorso;
+        }
+        if (matches_pattern(name, "lowertorso")) {
+            return &sdk::player::LowerTorso;
+        }
+        if (matches_pattern(name, "torso") && !matches_pattern(name, "upper") && !matches_pattern(name, "lower")) {
+            return &sdk::player::Torso;
+        }
+        if (matches_pattern(name, "leftarm") && !matches_pattern(name, "upper") && !matches_pattern(name, "lower")) {
+            return &sdk::player::LeftArm;
+        }
+        if (matches_pattern(name, "rightarm") && !matches_pattern(name, "upper") && !matches_pattern(name, "lower")) {
+            return &sdk::player::RightArm;
+        }
+        if (matches_pattern(name, "leftleg") && !matches_pattern(name, "upper") && !matches_pattern(name, "lower") && !matches_pattern(name, "foot")) {
+            return &sdk::player::LeftLeg;
+        }
+        if (matches_pattern(name, "rightleg") && !matches_pattern(name, "upper") && !matches_pattern(name, "lower") && !matches_pattern(name, "foot")) {
+            return &sdk::player::RightLeg;
+        }
+        if (matches_pattern(name, "leftupperleg")) {
+            return &sdk::player::LeftUpperLeg;
+        }
+        if (matches_pattern(name, "rightupperleg")) {
+            return &sdk::player::RightUpperLeg;
+        }
+        if (matches_pattern(name, "leftlowerleg")) {
+            return &sdk::player::LeftLowerLeg;
+        }
+        if (matches_pattern(name, "rightlowerleg")) {
+            return &sdk::player::RightLowerLeg;
+        }
+        if (matches_pattern(name, "leftfoot")) {
+            return &sdk::player::LeftFoot;
+        }
+        if (matches_pattern(name, "rightfoot")) {
+            return &sdk::player::RightFoot;
+        }
+        if (matches_pattern(name, "lefthand")) {
+            return &sdk::player::LeftHand;
+        }
+        if (matches_pattern(name, "righthand")) {
+            return &sdk::player::RightHand;
+        }
+        if (matches_pattern(name, "leftupperarm")) {
+            return &sdk::player::LeftUpperArm;
+        }
+        if (matches_pattern(name, "rightupperarm")) {
+            return &sdk::player::RightUpperArm;
+        }
+        if (matches_pattern(name, "leftlowerarm")) {
+            return &sdk::player::LeftLowerArm;
+        }
+        if (matches_pattern(name, "rightlowerarm")) {
+            return &sdk::player::RightLowerArm;
+        }
+        
+        return nullptr;
+    }
+
 
     struct healthsample
     {
@@ -195,45 +282,115 @@ namespace cache {
         }
     }
 
+    static void find_parts(sdk::instance container, sdk::player& player)
+    {
+        for (const auto& child : container.children())
+        {
+            if (!child.Address) continue;
+
+            std::string child_name = child.name();
+            std::string kind = child.kind();
+
+            // Only map named parts - skip accessories, tools, scripts etc.
+            if (kind == "Part" || kind == "MeshPart" || kind == "Humanoid" || kind == "HumanoidController") {
+
+                // Try exact match first
+                auto it = Part_Lookup.find(child_name);
+                if (it != Part_Lookup.end()) {
+                    player.*(it->second) = child;
+                }
+                else {
+                    // Try pattern matching for custom body part names
+                    auto member = find_member_for_pattern(child_name);
+                    if (member != nullptr) {
+                        player.*member = child;
+                    }
+                }
+
+                // Store body parts in Bones for fallback rendering
+                if (kind == "Part" || kind == "MeshPart") {
+                    player.Bones.push_back(child);
+                }
+            }
+
+            // Only recurse into Folders, not into Models (accessories, tools, etc.)
+            // Recursing into nested Models causes overwriting of correctly found parts
+            if (kind == "Folder")
+                find_parts(child, player);
+        }
+    }
+
     void data(sdk::player& player, const sdk::vector3& Local_Pos, bool Is_Local) {
         if (player.character.Address == 0) return;
 
-        auto children = player.character.children();
-        for (const auto& part : children) {
+        // Clear stale bone data before finding parts
+        player.Bones.clear();
 
-            auto it = Part_Lookup.find(part.name());
-            if (it != Part_Lookup.end()) {
+        find_parts(player.character, player);
 
-                player.*(it->second) = part;
-            }
-        }
-
+        // Always re-read humanoid health live — never trust cached values
+        // This ensures death state updates immediately even if character is stale
         if (player.humanoid.Address) {
-
-            sdk::humanoid humanoid(player.humanoid.Address);
-            player.Health = humanoid.health();
-            player.MaxHealth = humanoid.maxhealth();
-            player.Rig_Type = humanoid.rig();
+            try {
+                sdk::humanoid humanoid(player.humanoid.Address);
+                float h  = humanoid.health();
+                float mh = humanoid.maxhealth();
+                // Sanity check: if values are NaN or negative treat as 0
+                player.Health    = (std::isnan(h)  || h  < 0.f) ? 0.f : h;
+                player.MaxHealth = (std::isnan(mh) || mh < 0.f) ? 0.f : mh;
+                player.Rig_Type  = humanoid.rig();
+            } catch (...) {
+                player.Health    = 0.f;
+                player.MaxHealth = 0.f;
+            }
+        } else {
+            // No humanoid found — player is likely dead/respawning
+            player.Health    = 0.f;
+            player.MaxHealth = 0.f;
         }
 
         player.Tool_Name.clear();
         sdk::instance tool = player.character.childclass("Tool");
         if (tool.Address) {
-
             player.Tool_Name = tool.name();
         }
 
-        if (!Is_Local && player.Head.Address != 0 && global::camera.Address != 0) {
-
-            sdk::part Head(player.Head.Address);
-            sdk::vector3 Head_Pos = Head.partposition();
+        if (!Is_Local && global::camera.Address != 0) {
 
             sdk::camera camera(global::camera.Address);
             sdk::vector3 Camera_Pos = camera.position();
 
-            if (validpos(Head_Pos) && validpos(Camera_Pos)) {
-                player.Distance = distance(Head_Pos, Camera_Pos);
+            sdk::vector3 Target_Pos{};
+            bool found_pos = false;
+
+            if (player.Head.Address) {
+                sdk::part p(player.Head.Address);
+                Target_Pos = p.partposition();
+                found_pos = validpos(Target_Pos);
             }
+            if (!found_pos && player.HumanoidRootPart.Address) {
+                sdk::part p(player.HumanoidRootPart.Address);
+                Target_Pos = p.partposition();
+                found_pos = validpos(Target_Pos);
+            }
+            if (!found_pos && player.UpperTorso.Address) {
+                sdk::part p(player.UpperTorso.Address);
+                Target_Pos = p.partposition();
+                found_pos = validpos(Target_Pos);
+            }
+            if (!found_pos && player.Torso.Address) {
+                sdk::part p(player.Torso.Address);
+                Target_Pos = p.partposition();
+                found_pos = validpos(Target_Pos);
+            }
+            if (!found_pos && !player.Bones.empty()) {
+                sdk::part p(player.Bones[0].Address);
+                Target_Pos = p.partposition();
+                found_pos = validpos(Target_Pos);
+            }
+
+            if (found_pos && validpos(Camera_Pos))
+                player.Distance = distance(Target_Pos, Camera_Pos);
         }
     }
 
@@ -254,11 +411,15 @@ namespace cache {
 
             sdk::player player{};
             player.player = sdk::actor(instance.Address);
+            // Always re-fetch character — it changes on death/respawn
             player.character = player.player.character();
             player.name = instance.name();
             player.UserID = player.player.userid();
             player.Display_Name = player.player.display();
             player.Local_Player = false;
+
+            // Skip players with no character (haven't spawned yet)
+            if (!player.character.Address) continue;
 
             data(player, Local_Pos, false);
 
@@ -272,7 +433,13 @@ namespace cache {
                 }
             }
 
-            if (!global::setting::Client_Check || player.HumanoidRootPart.Address != global::LocalPlayer.HumanoidRootPart.Address) {
+            if (global::setting::BotCheck && is_bot(player.name)) {
+                continue;
+            }
+
+            if (!global::setting::Client_Check || 
+                (global::LocalPlayer.HumanoidRootPart.Address == 0) ||
+                (player.HumanoidRootPart.Address != global::LocalPlayer.HumanoidRootPart.Address)) {
 
                 actor.push_back(std::move(player));
             }
@@ -312,18 +479,26 @@ namespace cache {
         global::LocalPlayer = LocalPlayer;
         global::GameID = Current_GameID.load();
 
-        if (global::GameID == 292439477) {
-            std::vector<sdk::player> players;
+        static int empty_attempts = 0;
 
-            cacheplayer(players, Local_Position, LocalPlayer.name);
-            {
-                std::lock_guard<std::mutex> lock(Mutex);
-                global::Player_Cache = std::move(players);
-            }
-        }
-        else {
+        auto children = global::actor.children();
+        
+        if (!children.empty()) {
+            empty_attempts = 0;
             update(Local_Position, LocalPlayer.name);
         }
+        else if (++empty_attempts >= 2) {  // Reduced from 3 to 2 for faster fallback
+            // Use fallback detection (workspace search)
+            std::vector<sdk::player> players;
+            cacheplayer(players, Local_Position, LocalPlayer.name);
+            if (!players.empty()) {
+                std::lock_guard<std::mutex> lock(Mutex);
+                global::Player_Cache = std::move(players);
+                empty_attempts = 0; // Reset after successful fallback
+            }
+        }
+
+        game::detect();
     }
 }
 
@@ -349,7 +524,7 @@ void cache::run() {
         }
         catch (...) {}
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(150));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 

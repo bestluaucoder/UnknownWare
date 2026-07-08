@@ -16,7 +16,8 @@ enum ImKeyBindMode : int
 	ImKeyBindMode_None = 0,
 
 	ImKeyBindMode_Toggle = ImKeyBindMode_None,
-	ImKeyBindMode_Hold
+	ImKeyBindMode_Hold,
+	ImKeyBindMode_Always   // always active regardless of key
 };
 
 inline int ImGuiKeyToVK(ImGuiKey key)

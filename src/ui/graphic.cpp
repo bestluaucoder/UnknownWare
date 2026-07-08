@@ -14,10 +14,13 @@
 #include <cmath>
 #include <cfloat>
 #include <cstring>
+#include <shellapi.h>
+#pragma comment(lib, "shell32.lib")
 
 #include "ui/graphic.h"
 #include "ui/notify.h"
 #include "feature/cache.h"
+#include "feature/game.h"
 #include "global.h"
 
 #include <misc/imgui_freetype.h>
@@ -27,6 +30,9 @@
 #include "ui/font/bold.h"
 #include "ui/idalovesme/ida_assets.h"
 #include "feature/esp.h"
+#include "feature/misc.h"
+#include "feature/silent.h"
+#include "feature/media.h"
 #include <addons/Colors/Colors.h>
 #include "config.h"
 
@@ -166,13 +172,26 @@ bool graphic::imgui()
     cfg.FontLoaderFlags = 0;
     cfg.FontDataOwnedByAtlas = false;
 
+    // Glyph ranges: Basic Latin + Latin Extended + Cyrillic (for Russian track names)
+    static const ImWchar glyph_ranges[] = {
+        0x0020, 0x00FF, // Basic Latin + Latin Supplement
+        0x0400, 0x052F, // Cyrillic + Cyrillic Supplement
+        0x2000, 0x206F, // General Punctuation
+        0,
+    };
+
     const float sz = 12.0f * dpiScale;
     const char* fontPath = "C:\\Windows\\Fonts\\verdana.ttf";
     const char* fontSemi = "C:\\Windows\\Fonts\\verdanab.ttf";
     const char* fontBold = "C:\\Windows\\Fonts\\tahomabd.ttf";
     const char* fontBlack = "C:\\Windows\\Fonts\\tahomabd.ttf";
+
+    // Tahoma does not have Cyrillic — use Arial or Segoe UI as Cyrillic fallback
+    const char* cyrFont = "C:\\Windows\\Fonts\\arial.ttf";
+
     if (GetFileAttributesA(fontPath) != INVALID_FILE_ATTRIBUTES)
     {
+        cfg.GlyphRanges = glyph_ranges;
         UiFont = IO.Fonts->AddFontFromFileTTF(fontPath, sz, &cfg);
         Tahoma_BoldXP = IO.Fonts->AddFontFromFileTTF(
             GetFileAttributesA(fontBold) != INVALID_FILE_ATTRIBUTES ? fontBold : fontPath,
@@ -180,6 +199,15 @@ bool graphic::imgui()
         TitleFont = IO.Fonts->AddFontFromFileTTF(
             GetFileAttributesA(fontBold) != INVALID_FILE_ATTRIBUTES ? fontBold : fontPath,
             12.0f * dpiScale, &cfg);
+
+        // Merge Cyrillic from Arial into UiFont and Tahoma_BoldXP for full coverage
+        if (GetFileAttributesA(cyrFont) != INVALID_FILE_ATTRIBUTES) {
+            ImFontConfig mergeCfg = cfg;
+            mergeCfg.MergeMode  = true;
+            mergeCfg.GlyphRanges = glyph_ranges;
+            IO.Fonts->AddFontFromFileTTF(cyrFont, sz,            &mergeCfg);
+            IO.Fonts->AddFontFromFileTTF(cyrFont, 12.0f*dpiScale, &mergeCfg);
+        }
     }
     else
     {
@@ -264,6 +292,7 @@ void graphic::dropwindow()
 }
 void graphic::dropimgui()
 {
+    media::release();
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
@@ -362,17 +391,25 @@ void graphic::begin()
     {
         HWND _roblox = FindWindowA(0, "Roblox");
         HWND _fg = GetForegroundWindow();
+        static bool welcomed = false;
+        if (!welcome_done()) {
+            welcomed = false;
+        } else if (!welcomed) {
+            welcomed = true;
+            Running = true;
+        }
+
+        LONG exStyle = WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED;
+        if (!Running) exStyle |= WS_EX_TRANSPARENT;
+        SetWindowLong(Detail->Window, GWL_EXSTYLE, exStyle);
+
         static double lastToggle = -1.0;
         const double now = ImGui::GetTime();
         const int menuVk = menukey(global::setting::Menu_Key);
-        if (!welcome_done()) {}
-        else if (menuVk != 0 && (GetAsyncKeyState(menuVk) & 1) && (_fg == _roblox || _fg == Detail->Window) && now - lastToggle >= .18)
+        if (welcome_done() && menuVk != 0 && (GetAsyncKeyState(menuVk) & 1) && (_fg == _roblox || _fg == Detail->Window) && now - lastToggle >= .18)
         {
             lastToggle = now;
             Running = !Running;
-            LONG exStyle = WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED;
-            if (!Running) exStyle |= WS_EX_TRANSPARENT;
-            SetWindowLong(Detail->Window, GWL_EXSTYLE, exStyle);
         }
     }
 }
@@ -561,33 +598,34 @@ static ID3D11ShaderResourceView* texturefrompng(ID3D11Device* device, const BYTE
 
 namespace color
 {
-    static ImU32 Win = IM_COL32(35, 35, 35, 255);
-    static ImU32 Surface = IM_COL32(12, 12, 12, 255);
-    static ImU32 SurfaceLift = IM_COL32(31, 31, 31, 255);
-    static ImU32 card = IM_COL32(23, 23, 23, 255);
-    static ImU32 CardHov = IM_COL32(30, 30, 30, 255);
-    static ImU32 Border = IM_COL32(40, 40, 40, 255);
-    static ImU32 BorderDim = IM_COL32(12, 12, 12, 255);
-    static ImU32 Divider = IM_COL32(12, 12, 12, 255);
-    static ImU32 Accent = IM_COL32(163, 212, 31, 255);
-    static ImU32 AccentDim = IM_COL32(72, 89, 24, 255);
-    static ImU32 AccentHov = IM_COL32(190, 231, 72, 255);
-    static ImU32 AccentFg = IM_COL32(235, 245, 204, 255);
-    static ImU32 Purple = IM_COL32(204, 70, 205, 255);
-    static ImU32 PurpleDim = IM_COL32(58, 24, 58, 255);
-    static ImU32 Glow = IM_COL32(163, 212, 31, 55);
-    static ImU32 GlowPurple = IM_COL32(204, 70, 205, 44);
-    static ImU32 StripeCyan = IM_COL32(55, 177, 218, 255);
-    static ImU32 StripeLime = IM_COL32(204, 227, 53, 255);
-    static ImU32 text = IM_COL32(205, 205, 205, 255);
-    static ImU32 TextMid = IM_COL32(157, 157, 157, 255);
-    static ImU32 TextDim = IM_COL32(90, 90, 90, 255);
-    static ImU32 White = IM_COL32(255, 255, 255, 255);
-    static ImU32 Danger = IM_COL32(255, 80, 104, 255);
-    static ImU32 DangerDim = IM_COL32(63, 18, 28, 255);
-    static ImU32 DangerBrd = IM_COL32(135, 35, 55, 255);
-    static ImU32 Track = IM_COL32(18, 31, 42, 255);
-    static ImU32 Transp = IM_COL32(0, 0, 0, 0);
+    // ── Ghost Sigil inspired palette ──────────────────────────────────────────
+    static ImU32 Win         = IM_COL32(14, 14, 18, 245);
+    static ImU32 Surface     = IM_COL32(10, 10, 14, 255);
+    static ImU32 SurfaceLift = IM_COL32(28, 28, 36, 255);
+    static ImU32 card        = IM_COL32(20, 20, 28, 255);
+    static ImU32 CardHov     = IM_COL32(30, 30, 42, 255);
+    static ImU32 Border      = IM_COL32(255, 255, 255, 28);
+    static ImU32 BorderDim   = IM_COL32(255, 255, 255, 14);
+    static ImU32 Divider     = IM_COL32(255, 255, 255, 18);
+    static ImU32 Accent      = IM_COL32(163, 212, 31, 255);
+    static ImU32 AccentDim   = IM_COL32(72,  89,  24, 160);
+    static ImU32 AccentHov   = IM_COL32(190, 231, 72, 255);
+    static ImU32 AccentFg    = IM_COL32(235, 245, 204, 255);
+    static ImU32 Purple      = IM_COL32(130, 90, 255, 255);
+    static ImU32 PurpleDim   = IM_COL32(60,  40, 120, 160);
+    static ImU32 Glow        = IM_COL32(163, 212, 31, 38);
+    static ImU32 GlowPurple  = IM_COL32(130, 90, 255, 28);
+    static ImU32 StripeCyan  = IM_COL32(55, 177, 218, 255);
+    static ImU32 StripeLime  = IM_COL32(163, 212, 31, 255);
+    static ImU32 text        = IM_COL32(220, 220, 228, 255);
+    static ImU32 TextMid     = IM_COL32(150, 150, 162, 255);
+    static ImU32 TextDim     = IM_COL32(80,  80,  92, 255);
+    static ImU32 White       = IM_COL32(255, 255, 255, 255);
+    static ImU32 Danger      = IM_COL32(255, 80, 104, 255);
+    static ImU32 DangerDim   = IM_COL32(63,  18,  28, 255);
+    static ImU32 DangerBrd   = IM_COL32(135, 35,  55, 255);
+    static ImU32 Track       = IM_COL32(40,  40,  52, 255);
+    static ImU32 Transp      = IM_COL32(0,   0,   0,  0);
 
     static ImU32 lerp(ImU32 a, ImU32 b, float t);
     static ImU32 alpha(ImU32 c, float a);
@@ -599,26 +637,36 @@ namespace color
 
     static void refresh()
     {
-        Win = fromfloat(global::setting::color::Window);
-        Surface = lerp(Win, IM_COL32(0, 0, 0, 255), .66f);
-        card = fromfloat(global::setting::color::card);
-        SurfaceLift = lerp(card, IM_COL32(255, 255, 255, 255), .05f);
-        CardHov = lerp(card, IM_COL32(255, 255, 255, 255), .10f);
-        Accent = fromfloat(global::setting::color::Accent);
-        Purple = fromfloat(global::setting::color::Accent2);
-        AccentDim = alpha(Accent, .45f);
-        AccentHov = lerp(Accent, White, .20f);
-        AccentFg = lerp(Accent, White, .70f);
-        PurpleDim = alpha(Purple, .42f);
-        Glow = alpha(Accent, .22f);
-        GlowPurple = alpha(Purple, .18f);
-        text = fromfloat(global::setting::color::text);
-        TextMid = lerp(text, Win, .35f);
-        TextDim = lerp(text, Win, .58f);
-        Border = IM_COL32(40, 40, 40, 255);
-        BorderDim = IM_COL32(12, 12, 12, 255);
-        Divider = IM_COL32(12, 12, 12, 255);
-        Track = IM_COL32(52, 52, 52, 255);
+        // Base window — deep dark with slight blue-purple tint
+        const ImU32 userAccent  = fromfloat(global::setting::color::Accent);
+        const ImU32 userAccent2 = fromfloat(global::setting::color::Accent2);
+        const ImU32 userWindow  = fromfloat(global::setting::color::Window);
+        const ImU32 userCard    = fromfloat(global::setting::color::card);
+        const ImU32 userText    = fromfloat(global::setting::color::text);
+
+        Win         = userWindow;
+        Surface     = lerp(Win, IM_COL32(0, 0, 0, 255), .72f);
+        card        = userCard;
+        SurfaceLift = lerp(card, White, .06f);
+        CardHov     = lerp(card, White, .12f);
+
+        Accent      = userAccent;
+        Purple      = userAccent2;
+        AccentDim   = alpha(Accent, .40f);
+        AccentHov   = lerp(Accent, White, .22f);
+        AccentFg    = lerp(Accent, White, .68f);
+        PurpleDim   = alpha(Purple, .38f);
+        Glow        = alpha(Accent, .18f);
+        GlowPurple  = alpha(Purple, .15f);
+
+        text        = userText;
+        TextMid     = lerp(text, Win, .38f);
+        TextDim     = lerp(text, Win, .62f);
+
+        Border      = IM_COL32(255, 255, 255, 28);
+        BorderDim   = IM_COL32(255, 255, 255, 14);
+        Divider     = IM_COL32(255, 255, 255, 18);
+        Track       = IM_COL32(255, 255, 255, 30);
     }
 
     static ImU32 lerp(ImU32 a, ImU32 b, float t)
@@ -651,11 +699,12 @@ namespace notify
 
     void push(kind type, std::string title, std::string body, float lifetime)
     {
+        if (!global::overlay::Notifications) return;
         if (title.empty() && body.empty())
             return;
 
         std::lock_guard<std::mutex> lock(s_mutex);
-        while (s_toasts.size() >= 7)
+        while (s_toasts.size() >= 5)
             s_toasts.pop_front();
 
         s_toasts.push_back({
@@ -687,69 +736,148 @@ namespace notify
 
     void render()
     {
+        if (!global::overlay::Notifications) return;
+
         std::vector<toast> items;
         const auto now = std::chrono::steady_clock::now();
         {
             std::lock_guard<std::mutex> lock(s_mutex);
             s_toasts.erase(
                 std::remove_if(s_toasts.begin(), s_toasts.end(),
-                    [&](const toast& item)
-                    {
+                    [&](const toast& item) {
                         return std::chrono::duration<float>(now - item.Created).count() > item.Lifetime;
                     }),
                 s_toasts.end());
             items.assign(s_toasts.begin(), s_toasts.end());
         }
-
-        if (items.empty())
-            return;
+        if (items.empty()) return;
 
         ImDrawList* draw = ImGui::GetForegroundDrawList();
         const ImVec2 display = ImGui::GetIO().DisplaySize;
-        const float width = 270.f;
-        float damageY = 18.f;
-        float notifyY = display.y - 18.f;
+        const float  W   = 280.f;   // toast width
+        const float  R   = 10.f;    // corner radius
+        const float  PAD = 16.f;    // screen edge padding
+        const float  GAP = 8.f;     // gap between toasts
 
-        for (const toast& item : items)
+        // Damage toasts stack from top-left; normal toasts stack from bottom-right
+        float damageY = PAD;
+        float normalY = display.y - PAD;
+
+        ImFont* boldFont = Tahoma_BoldXP ? Tahoma_BoldXP : ImGui::GetFont();
+        ImFont* regFont  = UiFont        ? UiFont        : ImGui::GetFont();
+
+        for (int i = 0; i < (int)items.size(); i++)
         {
+            const toast& item = items[i];
             const float age = std::chrono::duration<float>(now - item.Created).count();
-            const float in = ImClamp(age / .18f, 0.f, 1.f);
-            const float out = item.Lifetime - age < .35f ? ImClamp((item.Lifetime - age) / .35f, 0.f, 1.f) : 1.f;
-            const float alpha = easeoutcubic(in) * out;
-            if (alpha <= .01f)
-                continue;
 
-            const bool hasBody = !item.Body.empty();
-            const float height = hasBody ? 54.f : 42.f;
-            const bool isDamage = item.Type == kind::damage;
-            const float x = isDamage
-                ? 18.f - (1.f - easeoutcubic(in)) * 18.f
-                : display.x - width - 18.f + (1.f - easeoutcubic(in)) * 18.f;
-            const float y = isDamage ? damageY : (notifyY - height);
-            const ImVec2 toastMin(x, y);
-            const ImVec2 toastMax(x + width, y + height);
-            const ImU32 edge = accent(item.Type, alpha);
+            // Slide in from right (or left for damage), fade out at end
+            const float in_t  = ImClamp(age / 0.20f, 0.f, 1.f);
+            const float in_e  = 1.f - (1.f - in_t) * (1.f - in_t) * (1.f - in_t); // ease out cubic
+            const float out_t = ImClamp((item.Lifetime - age) / 0.30f, 0.f, 1.f);
+            const float alpha = in_e * out_t;
+            if (alpha <= 0.01f) continue;
 
-            draw->AddRectFilled(toastMin + ImVec2(3.f, 4.f), toastMax + ImVec2(3.f, 4.f),
-                IM_COL32(0, 0, 0, (int)(95.f * alpha)), 5.f);
-            draw->AddRectFilled(toastMin, toastMax, color::alpha(color::Surface, .92f * alpha), 5.f);
-            draw->AddRect(toastMin, toastMax, color::alpha(color::Border, alpha), 5.f, 0, 1.f);
-            draw->AddRectFilled(toastMin, ImVec2(toastMin.x + 3.f, toastMax.y), edge, 5.f);
+            const bool  isDamage = (item.Type == kind::damage);
+            const bool  hasBody  = !item.Body.empty();
+            const float H        = hasBody ? 62.f : 46.f;
 
-            ImFont* titleFont = Tahoma_BoldXP ? Tahoma_BoldXP : ImGui::GetFont();
-            draw->AddText(titleFont, titleFont->LegacySize, toastMin + ImVec2(14.f, 9.f),
-                IM_COL32(245, 250, 255, (int)(255.f * alpha)), item.Title.c_str());
+            // Slide offset
+            const float slide = (1.f - in_e) * 22.f;
 
-            if (hasBody)
-            {
-                draw->AddText(toastMin + ImVec2(14.f, 30.f),
-                    IM_COL32(170, 184, 194, (int)(245.f * alpha)), item.Body.c_str());
+            float tx, ty;
+            if (isDamage) {
+                tx = PAD - slide;
+                ty = damageY;
+                damageY += H + GAP;
+            } else {
+                tx = display.x - W - PAD + slide;
+                ty = normalY - H;
+                normalY -= H + GAP;
             }
 
-            if (isDamage)
-                damageY += height + 8.f;
-            else
-                notifyY -= height + 8.f;
+            const ImVec2 tMin(tx, ty);
+            const ImVec2 tMax(tx + W, ty + H);
+
+            // Accent color per type
+            ImU32 accentCol;
+            switch (item.Type) {
+                case kind::success: accentCol = IM_COL32(50, 220, 120, 255); break;
+                case kind::warning: accentCol = IM_COL32(255, 195, 60,  255); break;
+                case kind::damage:  accentCol = IM_COL32(255, 75,  100, 255); break;
+                default:            accentCol = color::Accent;               break;
+            }
+
+            // Shadow
+            for (int s = 3; s >= 1; s--) {
+                const float sp = (float)s * 3.f;
+                draw->AddRectFilled(
+                    tMin + ImVec2(-sp*.2f, sp*.4f),
+                    tMax + ImVec2(sp*.2f, sp*.4f),
+                    IM_COL32(0, 0, 0, (int)((18 - s * 4) * alpha)), R + sp);
+            }
+
+            // Background — dark glass
+            draw->AddRectFilled(tMin, tMax, IM_COL32(12, 12, 17, (int)(230 * alpha)), R);
+
+            // Inner highlight (top edge specular)
+            draw->AddRectFilled(tMin + ImVec2(R, 1.f),
+                tMin + ImVec2(W - R, 2.5f),
+                IM_COL32(255, 255, 255, (int)(16 * alpha)), 1.f);
+
+            // Border
+            draw->AddRect(tMin, tMax,
+                IM_COL32(255, 255, 255, (int)(20 * alpha)), R, 0, 1.f);
+
+            // Left accent bar
+            draw->AddRectFilled(tMin + ImVec2(0.f, R),
+                tMin + ImVec2(3.f, H - R),
+                color::alpha(accentCol, alpha * 0.9f));
+            // Round the accent bar top/bottom with the corner
+            draw->AddRectFilled(tMin + ImVec2(0.f, R * 0.5f),
+                tMin + ImVec2(3.f, R),
+                color::alpha(accentCol, alpha * 0.9f));
+            draw->AddRectFilled(tMin + ImVec2(0.f, H - R),
+                tMin + ImVec2(3.f, H - R * 0.5f),
+                color::alpha(accentCol, alpha * 0.9f));
+
+            // Accent dot (icon)
+            const float dotX = tMin.x + 16.f;
+            const float dotY = tMin.y + (hasBody ? 13.f : H * 0.5f);
+            draw->AddCircleFilled({ dotX, dotY }, 4.f,
+                color::alpha(accentCol, alpha), 10);
+            draw->AddCircleFilled({ dotX, dotY }, 2.5f,
+                IM_COL32(255, 255, 255, (int)(200 * alpha)), 10);
+
+            // Title
+            const float textX = tMin.x + 28.f;
+            draw->AddText(boldFont, boldFont->LegacySize,
+                { textX, tMin.y + (hasBody ? 8.f : (H - boldFont->LegacySize) * 0.5f) },
+                IM_COL32(235, 238, 245, (int)(245 * alpha)),
+                item.Title.c_str());
+
+            // Body
+            if (hasBody) {
+                draw->AddText(regFont, regFont->LegacySize,
+                    { textX, tMin.y + boldFont->LegacySize + 12.f },
+                    IM_COL32(148, 158, 170, (int)(220 * alpha)),
+                    item.Body.c_str());
+            }
+
+            // Progress bar (shrinks over lifetime)
+            const float progress = 1.f - ImClamp(age / item.Lifetime, 0.f, 1.f);
+            const float barY = tMax.y - 3.f;
+            const float barX0 = tMin.x + R;
+            const float barX1 = tMax.x - R;
+            // Track
+            draw->AddRectFilled({ barX0, barY }, { barX1, barY + 2.f },
+                IM_COL32(255, 255, 255, (int)(18 * alpha)), 1.f);
+            // Fill
+            if (progress > 0.f) {
+                draw->AddRectFilled({ barX0, barY },
+                    { barX0 + (barX1 - barX0) * progress, barY + 2.f },
+                    color::alpha(accentCol, alpha * 0.7f), 1.f);
+            }
         }
     }
 }
@@ -969,14 +1097,22 @@ namespace ui
 
     static void labelsection(const char* text)
     {
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        const ImVec2 p = ImGui::GetCursorScreenPos();
+        ImDrawList* dl    = ImGui::GetWindowDrawList();
+        const ImVec2 p    = ImGui::GetCursorScreenPos();
+        const float  avail = ImGui::GetContentRegionAvail().x;
+        const float  fh   = ImGui::GetFontSize();
 
-        dl->AddText(p + ImVec2(1.f, 1.f), IM_COL32(15, 15, 15, 220), text);
-        dl->AddText(p, color::Accent, text);
-        const float y = p.y + ImGui::GetFontSize() + 5.f;
-        dl->AddLine({ p.x, y }, { p.x + ImGui::GetContentRegionAvail().x, y }, color::BorderDim);
-        ImGui::Dummy({ 0.f, ImGui::GetFontSize() + 9.f });
+        // Dim uppercase label
+        dl->AddText(p, color::TextDim, text);
+
+        // Line after text
+        const float textW = ImGui::CalcTextSize(text).x;
+        const float lineY = p.y + fh * .5f;
+        dl->AddLine({ p.x + textW + 8.f, lineY },
+                    { p.x + avail,        lineY },
+                    color::Divider, 1.f);
+
+        ImGui::Dummy({ 0.f, fh + 6.f });
     }
 
     static void gap(float px = 4.f) { ImGui::Dummy({ 0.f, px }); }
@@ -994,30 +1130,44 @@ namespace ui
     static bool toggle(const char* label, bool* v)
     {
         ImGui::PushID(label);
-        const ImVec2   p = ImGui::GetCursorScreenPos();
-        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const ImVec2 p   = ImGui::GetCursorScreenPos();
+        ImDrawList*  dl  = ImGui::GetWindowDrawList();
 
         const ImVec2 textSize = ImGui::CalcTextSize(label);
-        const float rowH = ImMax(14.f, textSize.y);
-        const float rowW = ImMin(ImGui::GetContentRegionAvail().x, textSize.x + 24.f);
+        const float  rowH     = ImMax(20.f, textSize.y);
+        const float  TW = 36.f, TH = 18.f, TR = TH * 0.5f;
 
-        ImGui::InvisibleButton("##t", { rowW, rowH });
+        // Hit region: only cover the pill + label width, NOT full row width.
+        // This prevents the toggle eating clicks intended for bind/color widgets
+        // placed via SameLine() to the right.
+        const float hitW = TW + 10.f + textSize.x;
+        ImGui::InvisibleButton("##t", { hitW, rowH });
         const bool clicked = ImGui::IsItemClicked();
-        const bool hov = ImGui::IsItemHovered();
+        const bool hov     = ImGui::IsItemHovered();
         if (clicked) *v = !*v;
 
-        const float t = fx::togglet(ImGui::GetItemID(), *v);
-        const ImVec2 boxMin = p + ImVec2(0.f, floorf((rowH - 8.f) * .5f));
-        const ImVec2 boxMax = boxMin + ImVec2(8.f, 8.f);
-        const ImU32 top = *v ? color::Accent : (hov ? IM_COL32(85, 85, 85, 255) : IM_COL32(77, 77, 77, 255));
-        const ImU32 bot = *v ? color::alpha(color::Accent, .72f) : (hov ? IM_COL32(55, 55, 55, 255) : IM_COL32(47, 47, 47, 255));
-        dl->AddRectFilledMultiColor(boxMin + ImVec2(1.f, 1.f), boxMax - ImVec2(1.f, 1.f),
-            top, top, bot, bot);
-        dl->AddRect(boxMin, boxMax, color::BorderDim);
-        if (t > .01f)
-            dl->AddRect(boxMin + ImVec2(1.f, 1.f), boxMax - ImVec2(1.f, 1.f),
-                color::alpha(color::AccentFg, .30f * t));
-        dl->AddText({ p.x + 20.f, p.y + (rowH - ImGui::GetFontSize()) * .5f - 1.f },
+        // Smooth knob animation
+        const float t = fx::easeinoutcubic(fx::anim(ImGui::GetItemID(), *v, 9.5f));
+
+        // Pill track
+        const ImVec2 tMin = p + ImVec2(0.f, floorf((rowH - TH) * .5f));
+        const ImVec2 tMax = tMin + ImVec2(TW, TH);
+        const ImU32  trackOff = color::alpha(color::Border, 0.6f);
+        const ImU32  trackOn  = color::alpha(color::Accent, 0.85f);
+        const ImU32  track    = color::lerp(trackOff, trackOn, t);
+        dl->AddRectFilled(tMin, tMax, track, TR);
+        dl->AddRect(tMin, tMax, color::alpha(color::Border, 0.4f), TR, 0, 1.f);
+
+        // Knob
+        const float kx = tMin.x + TR + t * (TW - TH);
+        const float ky = tMin.y + TR;
+        dl->AddCircleFilled({ kx + 0.5f, ky + 0.5f }, TR - 3.f, IM_COL32(0, 0, 0, 55));
+        dl->AddCircleFilled({ kx, ky }, TR - 3.f, color::White);
+
+        // Label
+        const float lx = tMin.x + TW + 10.f;
+        const float ly = p.y + (rowH - ImGui::GetFontSize()) * .5f;
+        dl->AddText({ lx, ly },
             *v ? color::text : color::TextMid, label);
 
         ImGui::PopID();
@@ -1101,45 +1251,52 @@ namespace ui
     static bool sliderfloat(const char* label, float* v, float mn, float mx, const char* fmt = "%.2f")
     {
         ImGui::PushID(label);
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        const ImVec2 origin = ImGui::GetCursorScreenPos();
-        const float avail = ImGui::GetContentRegionAvail().x;
-        const float labelH = ImGui::GetFontSize();
-        const float w = ImMin(controlwidth(), ImMax(63.f, avail - 20.f));
-        const float totalH = labelH + 14.f;
-        const ImVec2 p = origin + ImVec2(20.f, 0.f);
+        ImDrawList* dl     = ImGui::GetWindowDrawList();
+        const ImVec2 orig  = ImGui::GetCursorScreenPos();
+        const float  avail = ImGui::GetContentRegionAvail().x;
+        const float  lH    = ImGui::GetFontSize();
+        const float  w     = ImMin(controlwidth(), ImMax(63.f, avail - 20.f));
+        const float  KR    = 6.f;
+        const float  BH    = 4.f;
+        const float  totalH = lH + 14.f;
+        const ImVec2 p = orig + ImVec2(20.f, 0.f);
 
         ImGui::InvisibleButton("##sl", { ImMin(avail, 20.f + w), totalH });
         const bool active = ImGui::IsItemActive();
-        const bool hov = ImGui::IsItemHovered();
-        const ImVec2 barMin = { p.x, p.y + labelH + 5.f };
-        const ImVec2 barMax = { p.x + w, barMin.y + 6.f };
-        if (active)
-        {
+        const bool hov    = ImGui::IsItemHovered();
+
+        const ImVec2 barMin = { p.x, p.y + lH + 5.f };
+        const ImVec2 barMax = { p.x + w, barMin.y + BH };
+
+        if (active) {
             float rel = (ImGui::GetIO().MousePos.x - barMin.x) / w;
             *v = mn + ImClamp(rel, 0.f, 1.f) * (mx - mn);
         }
+
         const float t = mx == mn ? 0.f : ImClamp((*v - mn) / (mx - mn), 0.f, 1.f);
 
+        // Track
+        dl->AddRectFilled(barMin, barMax, color::Track, BH * .5f);
+
+        // Fill
+        const float fillW = ImClamp(w * t, 1.f, w);
+        if (fillW > 0.f) {
+            dl->AddRectFilled(barMin, { barMin.x + fillW, barMax.y },
+                active ? color::AccentHov : color::Accent, BH * .5f);
+        }
+
+        // Knob — grows slightly on hover
+        const float kr = active ? KR + 1.f : (hov ? KR + 0.5f : KR);
+        const ImVec2 kc = { barMin.x + fillW, barMin.y + BH * .5f };
+        dl->AddCircleFilled({ kc.x + 0.5f, kc.y + 0.5f }, kr, IM_COL32(0, 0, 0, 80));
+        dl->AddCircleFilled(kc, kr, active ? color::AccentHov : color::Accent);
+
+        // Label + value
         char buf[32]{};
         snprintf(buf, sizeof(buf), fmt ? fmt : "%.2f", *v);
-        const float filledW = ImClamp(w * t, 1.f, w);
-        dl->AddText(p + ImVec2(0.f, -1.f), color::text, label);
-        dl->AddRectFilledMultiColor(barMin + ImVec2(1.f, 1.f), barMax - ImVec2(1.f, 1.f),
-            hov ? IM_COL32(72, 72, 72, 255) : IM_COL32(52, 52, 52, 255),
-            hov ? IM_COL32(92, 92, 92, 255) : IM_COL32(72, 72, 72, 255),
-            hov ? IM_COL32(92, 92, 92, 255) : IM_COL32(72, 72, 72, 255),
-            hov ? IM_COL32(72, 72, 72, 255) : IM_COL32(52, 52, 52, 255));
-        dl->AddRectFilled(barMin + ImVec2(1.f, 1.f), { barMin.x + filledW, barMax.y - 1.f },
-            active ? color::AccentHov : color::Accent);
-        dl->AddRectFilledMultiColor(barMin + ImVec2(1.f, 1.f), { barMin.x + filledW, barMax.y - 1.f },
-            IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0),
-            IM_COL32(0, 0, 0, 92), IM_COL32(0, 0, 0, 92));
-        dl->AddRect(barMin, barMax, color::BorderDim);
-        const ImVec2 valueSize = ImGui::CalcTextSize(buf);
-        const float vx = ImClamp(barMin.x + filledW - valueSize.x * .5f, barMin.x + 2.f, barMax.x - valueSize.x - 2.f);
-        dl->AddText({ vx + 1.f, barMin.y - 3.f }, IM_COL32(15, 15, 15, 200), buf);
-        dl->AddText({ vx, barMin.y - 4.f }, color::White, buf);
+        dl->AddText(p + ImVec2(0.f, -1.f), color::TextMid, label);
+        const ImVec2 valSz = ImGui::CalcTextSize(buf);
+        dl->AddText({ barMax.x - valSz.x, p.y - 1.f }, color::text, buf);
 
         ImGui::PopID();
         return ImGui::IsItemDeactivatedAfterEdit();
@@ -1222,9 +1379,10 @@ namespace ui
 
     static float bindwidth(ImGuiKey key, ImKeyBindMode mode)
     {
-        const char* kn = ImGui::GetKeyName(key);
-        if (!kn || !*kn) kn = "NONE";
-        const char* mn = (mode == ImKeyBindMode_Hold) ? "HOLD" : "TOGG";
+        const char* kn = (key == ImGuiKey_None) ? "[-]" : ImGui::GetKeyName(key);
+        if (!kn || !*kn) kn = "[-]";
+        const char* mn = (mode == ImKeyBindMode_Hold) ? "HOLD"
+                       : (mode == ImKeyBindMode_Always) ? "ALWY" : "TOGG";
         const float kw = ImMax(ImGui::CalcTextSize(kn).x + 14.f, 38.f);
         const float mw = ImGui::CalcTextSize(mn).x + 10.f;
         return kw + 3.f + mw;
@@ -1239,37 +1397,55 @@ namespace ui
         ImDrawList* dl = ImGui::GetWindowDrawList();
         const float h = 18.f;
         const char* kn = ImGui::GetKeyName(*key);
-        if (!kn || !*kn) kn = "NONE";
-        const char* mn = (*mode == ImKeyBindMode_Hold) ? "HOLD" : "TOGG";
+        if (!kn || !*kn || *key == ImGuiKey_None) kn = "[-]";
+        const char* mn = (*mode == ImKeyBindMode_Hold) ? "HOLD"
+                       : (*mode == ImKeyBindMode_Always) ? "ALWY" : "TOGG";
         const float kw = ImMax(ImGui::CalcTextSize(kn).x + 14.f, 38.f);
         const float mw = ImGui::CalcTextSize(mn).x + 10.f;
         const bool  listening = s_listen && (s_ownerId == self);
 
+        // Allow overlapping with previous item (toggle placed via SameLine)
+        ImGui::SetNextItemAllowOverlap();
         const ImVec2 kp = ImGui::GetCursorScreenPos();
         ImGui::InvisibleButton("##k", { kw, h });
-        if (ImGui::IsItemClicked()) { s_listen = true; s_ownerId = self; }
+        // Left-click = start listening, Right-click = clear to None
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Left))  { s_listen = true; s_ownerId = self; }
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) { *key = ImGuiKey_None; s_listen = false; }
         if (listening) {
-            for (int k = ImGuiKey_Tab; k < ImGuiKey_COUNT; k++)
-                if (ImGui::IsKeyPressed((ImGuiKey)k, false))
-                {
-                    *key = (ImGuiKey)k;
-                    s_listen = false;
-                    break;
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+                s_listen = false;
+            } else {
+                for (int k = ImGuiKey_Tab; k < ImGuiKey_COUNT; k++) {
+                    if (k == ImGuiKey_Escape) continue;
+                    if (ImGui::IsKeyPressed((ImGuiKey)k, false)) {
+                        *key = (ImGuiKey)k;
+                        s_listen = false;
+                        break;
+                    }
                 }
+            }
         }
+        // Re-evaluate display string after possible clear
+        const char* kn_display = (*key == ImGuiKey_None) ? "[-]"
+                                 : (listening ? "..." : kn);
         dl->AddRectFilled(kp, kp + ImVec2(kw, h), listening ? color::AccentDim : color::SurfaceLift);
         dl->AddRect(kp, kp + ImVec2(kw, h), listening ? color::Accent : color::BorderDim);
-        dl->AddText({ kp.x + (kw - ImGui::CalcTextSize(kn).x) * .5f,
+        dl->AddText({ kp.x + (kw - ImGui::CalcTextSize(kn_display).x) * .5f,
                      kp.y + (h - ImGui::GetFontSize()) * .5f },
-            listening ? color::AccentFg : color::text, kn);
+            listening ? color::AccentFg
+            : (*key == ImGuiKey_None ? color::TextDim : color::text),
+            kn_display);
 
         ImGui::SameLine(0.f, 3.f);
 
+        ImGui::SetNextItemAllowOverlap();
         const ImVec2 mp = ImGui::GetCursorScreenPos();
         ImGui::InvisibleButton("##m", { mw, h });
         const bool mhov = ImGui::IsItemHovered();
         if (ImGui::IsItemClicked())
-            *mode = (*mode == ImKeyBindMode_Hold) ? ImKeyBindMode_Toggle : ImKeyBindMode_Hold;
+            *mode = (*mode == ImKeyBindMode_Hold) ? ImKeyBindMode_Always
+                  : (*mode == ImKeyBindMode_Always) ? ImKeyBindMode_Toggle
+                  : ImKeyBindMode_Hold;
         dl->AddRectFilled(mp, mp + ImVec2(mw, h), mhov ? color::CardHov : color::SurfaceLift);
         dl->AddRect(mp, mp + ImVec2(mw, h), color::BorderDim);
         dl->AddText({ mp.x + (mw - ImGui::CalcTextSize(mn).x) * .5f,
@@ -1295,13 +1471,14 @@ namespace ui
         ImDrawList* dl = ImGui::GetWindowDrawList();
         const float h = 18.f;
         const char* kn = ImGui::GetKeyName(*key);
-        if (!kn || !*kn) kn = "NONE";
+        if (!kn || !*kn || *key == ImGuiKey_None) kn = "[-]";
         const float w = keywidth(*key);
         const bool listening = s_listen && (s_ownerId == self);
 
         const ImVec2 p = ImGui::GetCursorScreenPos();
         ImGui::InvisibleButton("##key", { w, h });
-        if (ImGui::IsItemClicked()) { s_listen = true; s_ownerId = self; }
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Left))  { s_listen = true; s_ownerId = self; }
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) { *key = ImGuiKey_None; s_listen = false; }
         if (listening) {
             for (int k = ImGuiKey_Tab; k < ImGuiKey_COUNT; k++)
                 if (ImGui::IsKeyPressed((ImGuiKey)k, false))
@@ -1312,12 +1489,14 @@ namespace ui
                 }
         }
 
-        const char* text = listening ? "..." : kn;
+        const char* text = listening ? "..." : (*key == ImGuiKey_None ? "[-]" : kn);
         const float tw = ImGui::CalcTextSize(text).x;
         dl->AddRectFilled(p, p + ImVec2(w, h), listening ? color::AccentDim : color::SurfaceLift);
         dl->AddRect(p, p + ImVec2(w, h), listening ? color::Accent : color::BorderDim);
         dl->AddText({ p.x + (w - tw) * .5f, p.y + (h - ImGui::GetFontSize()) * .5f },
-            listening ? color::AccentFg : color::text, text);
+            listening ? color::AccentFg
+            : (*key == ImGuiKey_None ? color::TextDim : color::text),
+            text);
 
         ImGui::PopID();
     }
@@ -1348,57 +1527,63 @@ namespace ui
     struct card {
         static bool begin(const char* id, ImVec2 size, const char* title = nullptr)
         {
-            const ImVec2 p = ImGui::GetCursorScreenPos();
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            auto drawIdaChildFrame = [&](ImDrawList* out)
-                {
-                    if (size.x <= 0.f || size.y <= 0.f)
-                        return;
+            const ImVec2 p  = ImGui::GetCursorScreenPos();
+            ImDrawList*  dl = ImGui::GetWindowDrawList();
 
-                    const ImU32 shadow = color::BorderDim;
-                    const ImU32 border = color::Border;
-                    const char* label = (title && *title) ? title : "";
-                    ImFont* titleFont = Tahoma_BoldXP ? Tahoma_BoldXP : ImGui::GetFont();
-                    const float titleSize = ImGui::GetFontSize();
-                    const ImVec2 labelSize = label[0]
-                        ? titleFont->CalcTextSizeA(titleSize, FLT_MAX, 0.f, label)
-                        : ImVec2(0.f, 0.f);
+            // Ghost Sigil–style frosted glass card
+            auto drawCard = [&](ImDrawList* out) {
+                if (size.x <= 0.f || size.y <= 0.f) return;
+                const float R = 10.f;
 
-                    out->AddRectFilled(p + ImVec2(2.f, 2.f), p + size - ImVec2(3.f, 3.f), color::card);
+                // Shadow
+                for (int i = 4; i >= 1; i--) {
+                    const float sp = (float)i * 4.f;
+                    out->AddRectFilled(
+                        p + ImVec2(-sp*.3f, sp*.2f),
+                        p + size + ImVec2(sp*.3f, sp*.5f),
+                        IM_COL32(0, 0, 0, (int)(20 - i * 3)), R + sp);
+                }
 
-                    out->AddLine(p, p + ImVec2(0.f, size.y), shadow);
-                    out->AddLine(p + ImVec2(0.f, size.y - 1.f), p + size - ImVec2(0.f, 1.f), shadow);
-                    out->AddLine(p + size - ImVec2(1.f, 1.f), p + ImVec2(size.x - 1.f, 0.f), shadow);
-                    out->AddLine(p, p + ImVec2(10.f, 0.f), shadow);
-                    out->AddLine(p + ImVec2(16.f + labelSize.x, 0.f), p + ImVec2(size.x, 0.f), shadow);
+                // Card fill
+                out->AddRectFilled(p, p + size, color::card, R);
 
-                    out->AddLine(p + ImVec2(1.f, 1.f), p + ImVec2(1.f, size.y - 1.f), border);
-                    out->AddLine(p + ImVec2(1.f, size.y - 2.f), p + size - ImVec2(1.f, 2.f), border);
-                    out->AddLine(p + size - ImVec2(2.f, 2.f), p + ImVec2(size.x - 2.f, 1.f), border);
-                    out->AddLine(p + ImVec2(1.f, 1.f), p + ImVec2(10.f, 1.f), border);
-                    out->AddLine(p + ImVec2(16.f + labelSize.x, 1.f), p + ImVec2(size.x - 1.f, 1.f), border);
-                    out->AddTriangleFilled(p + size - ImVec2(2.f, 2.f), p + size - ImVec2(2.f, 8.f), p + size - ImVec2(8.f, 2.f), border);
+                // Subtle inner highlight (top edge)
+                out->AddRectFilled(p + ImVec2(1.f, 1.f),
+                    p + ImVec2(size.x - 1.f, 3.f),
+                    IM_COL32(255, 255, 255, 12), R);
 
-                    if (label[0])
-                    {
-                        const ImVec2 textPos = p + ImVec2(13.f, -(labelSize.y * .5f));
-                        out->AddText(titleFont, titleSize, textPos + ImVec2(1.f, 1.f), IM_COL32(15, 15, 15, 255), label);
-                        out->AddText(titleFont, titleSize, textPos, color::text, label);
-                    }
-                };
+                // Border
+                out->AddRect(p, p + size, color::Border, R, 0, 1.f);
 
-            drawIdaChildFrame(dl);
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(color::card));
-            ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(color::Transp));
-            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.f);
+                // Title label
+                if (title && *title) {
+                    ImFont* tf      = Tahoma_BoldXP ? Tahoma_BoldXP : ImGui::GetFont();
+                    const float tsz = ImGui::GetFontSize();
+                    const ImVec2 tp = p + ImVec2(kCardPadX, 8.f);
+                    out->AddText(tf, tsz, tp, color::TextDim, title);
+                    // Divider under title
+                    const float dY = tp.y + tsz + 5.f;
+                    out->AddLine({ p.x + 1.f, dY }, { p.x + size.x - 1.f, dY },
+                        color::Divider, 1.f);
+                }
+            };
+
+            drawCard(dl);
+
+            const float titleOffset = (title && *title) ? (ImGui::GetFontSize() + 16.f) : 0.f;
+            ImGui::PushStyleColor(ImGuiCol_ChildBg,  ImGui::ColorConvertU32ToFloat4(color::Transp));
+            ImGui::PushStyleColor(ImGuiCol_Border,   ImGui::ColorConvertU32ToFloat4(color::Transp));
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding,  0.f);
             ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.f);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kCardPadX, kCardPadY));
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 4.f));
-            const bool open = ImGui::BeginChild(id, size, false, ImGuiWindowFlags_AlwaysUseWindowPadding);
-            if (open)
-            {
-                drawIdaChildFrame(ImGui::GetWindowDrawList());
-                ImGui::SetCursorPos(ImVec2(kCardPadX, kCardPadY));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                ImVec2(kCardPadX, titleOffset > 0.f ? 4.f : kCardPadY));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 6.f));
+            const bool open = ImGui::BeginChild(id, size, false,
+                ImGuiWindowFlags_AlwaysUseWindowPadding);
+            if (open) {
+                drawCard(ImGui::GetWindowDrawList());
+                ImGui::SetCursorPos(ImVec2(kCardPadX,
+                    (titleOffset > 0.f ? titleOffset : kCardPadY)));
             }
             return open;
         }
@@ -1572,11 +1757,10 @@ namespace hud
 
     static bool keylive(bool enabled, ImGuiKey key, ImKeyBindMode mode)
     {
-        if (!enabled)
-            return false;
-        if (mode == ImKeyBindMode_Hold)
-            return asynckey(key);
-        return true;
+        if (!enabled) return false;
+        if (mode == ImKeyBindMode_Always) return true;
+        if (mode == ImKeyBindMode_Hold) return asynckey(key);
+        return true; // Toggle — always on when enabled
     }
 
     static int hotkeycount()
@@ -1663,53 +1847,186 @@ namespace hud
 
     static void watermark(ImDrawList* dl, ImVec2 p, ImVec2 s, bool hovered, bool active)
     {
-        ImFont* font = solusfont();
-        const float fs = ImMax(10.f, font->LegacySize - 1.f);
+        // Ghost Sigil style — dark glass pill with accent line
+        const float R = 8.f;
+        // Shadow
+        dl->AddRectFilled(p + ImVec2(0.f, 3.f), p + s + ImVec2(0.f, 3.f),
+            IM_COL32(0, 0, 0, 55), R);
+        // Background
+        dl->AddRectFilled(p, p + s, IM_COL32(12, 12, 17, 210), R);
+        // Top specular
+        dl->AddRectFilled(p + ImVec2(R, 1.f), p + ImVec2(s.x - R, 2.5f),
+            IM_COL32(255, 255, 255, 18), 1.f);
+        // Border
+        dl->AddRect(p, p + s, IM_COL32(255, 255, 255, 22), R, 0, 1.f);
+        // Accent left bar
+        dl->AddRectFilled(p + ImVec2(0.f, R), p + ImVec2(2.5f, s.y - R),
+            accent(.75f));
 
-        SYSTEMTIME st{};
-        GetLocalTime(&st);
+        ImFont* font = Tahoma_BoldXP ? Tahoma_BoldXP : ImGui::GetFont();
+        const float fs = font->LegacySize;
+        ImFont* reg = UiFont ? UiFont : font;
 
-        char info[160]{};
-        std::snprintf(info, sizeof(info), "%s   unknownware   64tick   %02u:%02u",
-            pcuser(), (unsigned)st.wHour, (unsigned)st.wMinute);
-        char perf[48]{};
-        const float framerate = ImMax(1.f, ImGui::GetIO().Framerate);
-        std::snprintf(perf, sizeof(perf), "%.1fms / %.0fhz", 1000.f / framerate, framerate);
+        // "unknownware" brand — accent colored
+        const char* brand = "unknownware";
+        const ImVec2 bsz = font->CalcTextSizeA(fs, FLT_MAX, 0.f, brand);
+        dl->AddText(font, fs, p + ImVec2(12.f, (s.y - fs) * .5f),
+            accent(1.f), brand);
 
-        const ImVec2 topSize(s.x, 17.f);
-        const ImVec2 perfSize(82.f, 17.f);
-        const ImVec2 perfPos(p.x + s.x - perfSize.x, p.y + 23.f);
-        solusbox(dl, p, topSize, hovered, active);
-        solusbox(dl, perfPos, perfSize, hovered, active);
+        // Separator dot
+        float cx = p.x + 12.f + bsz.x + 8.f;
+        dl->AddCircleFilled({ cx, p.y + s.y * .5f }, 2.f,
+            IM_COL32(255, 255, 255, 55), 6);
+        cx += 10.f;
 
-        const ImVec2 infoSize = font->CalcTextSizeA(fs, FLT_MAX, 0.f, info);
-        dl->AddText(font, fs, p + ImVec2((s.x - infoSize.x) * .5f, 2.f), soluswhite(), info);
-        dl->AddText(font, fs, perfPos + ImVec2(6.f, 2.f), soluswhite(), perf);
+        // FPS
+        const float fps = ImMax(1.f, ImGui::GetIO().Framerate);
+        char fps_buf[32]; std::snprintf(fps_buf, sizeof(fps_buf), "%.0f fps", fps);
+        const ImVec2 fpssz = reg->CalcTextSizeA(reg->LegacySize, FLT_MAX, 0.f, fps_buf);
+        dl->AddText(reg, reg->LegacySize, { cx, p.y + (s.y - reg->LegacySize) * .5f },
+            IM_COL32(160, 165, 178, 200), fps_buf);
+        cx += fpssz.x + 8.f;
+
+        dl->AddCircleFilled({ cx, p.y + s.y * .5f }, 2.f,
+            IM_COL32(255, 255, 255, 55), 6);
+        cx += 10.f;
+
+        // Time
+        SYSTEMTIME st{}; GetLocalTime(&st);
+        char time_buf[16]; std::snprintf(time_buf, sizeof(time_buf), "%02u:%02u", st.wHour, st.wMinute);
+        dl->AddText(reg, reg->LegacySize, { cx, p.y + (s.y - reg->LegacySize) * .5f },
+            IM_COL32(130, 135, 148, 180), time_buf);
     }
 
     static void hotkeyrow(ImDrawList* dl, ImVec2 p, float w, const char* label, ImGuiKey key, ImKeyBindMode mode, bool live)
     {
-        ImFont* font = solusfont();
-        const float fs = ImMax(10.f, font->LegacySize - 1.f);
-        const ImU32 rowColor = live ? soluswhite(1.f) : soluswhite(.64f);
-        const char* modeName = solusmode(mode);
-        const ImVec2 modeSize = font->CalcTextSizeA(fs, FLT_MAX, 0.f, modeName);
+        ImFont* font = UiFont ? UiFont : ImGui::GetFont();
+        const float fs = font->LegacySize;
+        const char* kn = ImGui::GetKeyName(key);
+        if (!kn || !*kn) kn = "---";
 
-        dl->AddText(font, fs, p, rowColor, label);
-        dl->AddText(font, fs, ImVec2(p.x + w - modeSize.x, p.y), rowColor, modeName);
+        // Purple glow row background when active
+        if (live) {
+            dl->AddRectFilled(p - ImVec2(6.f, 1.f), p + ImVec2(w + 6.f, fs + 3.f),
+                IM_COL32(130, 90, 255, 28), 4.f);
+        }
+
+        // Label
+        ImU32 labelCol = live
+            ? IM_COL32(210, 190, 255, 255)
+            : IM_COL32(180, 180, 192, 180);
+        dl->AddText(font, fs, p, labelCol, label);
+
+        // Key chip (right-aligned)
+        const float chipPad = 5.f;
+        ImVec2 knSz = font->CalcTextSizeA(fs, FLT_MAX, 0.f, kn);
+        float chipW = knSz.x + chipPad * 2.f;
+        float chipX = p.x + w - chipW;
+        ImVec2 chipMin(chipX, p.y - 1.f);
+        ImVec2 chipMax(chipX + chipW, p.y + fs + 1.f);
+
+        ImU32 chipBg  = live ? IM_COL32(100, 60, 200, 160) : IM_COL32(30, 30, 40, 160);
+        ImU32 chipBrd = live ? IM_COL32(160, 100, 255, 200) : IM_COL32(80, 80, 100, 120);
+        dl->AddRectFilled(chipMin, chipMax, chipBg, 3.f);
+        dl->AddRect(chipMin, chipMax, chipBrd, 3.f, 0, 1.f);
+        dl->AddText(font, fs, { chipX + chipPad, p.y },
+            live ? IM_COL32(230, 210, 255, 255) : IM_COL32(180, 180, 200, 200), kn);
+
+        // Mode dot
+        if (mode == ImKeyBindMode_Toggle) {
+            ImU32 dotCol = live ? IM_COL32(160, 100, 255, 255) : IM_COL32(80, 80, 100, 160);
+            dl->AddCircleFilled({ chipX - 6.f, p.y + fs * .5f }, 2.5f, dotCol, 8);
+        }
     }
 
     static void hotkey(ImDrawList* dl, ImVec2 p, ImVec2 s, bool hovered, bool active)
     {
-        solusbox(dl, p, s, hovered, active);
+        // Ghost Sigil style panel
+        const float R = 8.f;
+        dl->AddRectFilled(p + ImVec2(0.f, 3.f), p + s + ImVec2(0.f, 3.f), IM_COL32(0, 0, 0, 55), R);
+        dl->AddRectFilled(p, p + s, IM_COL32(12, 12, 17, 210), R);
+        dl->AddRectFilled(p + ImVec2(R, 1.f), p + ImVec2(s.x - R, 2.5f), IM_COL32(255, 255, 255, 14), 1.f);
+        dl->AddRect(p, p + s, IM_COL32(255, 255, 255, 22), R, 0, 1.f);
+        // Purple accent top bar
+        dl->AddRectFilled(p + ImVec2(R + 2.f, 0.f), p + ImVec2(s.x - R - 2.f, 2.f),
+            IM_COL32(130, 90, 255, 180), 1.f);
 
-        ImFont* title = solusfont();
-        const float titleSize = ImMax(10.f, title->LegacySize - 1.f);
+        ImFont* titleFont = Tahoma_BoldXP ? Tahoma_BoldXP : ImGui::GetFont();
+        ImFont* rowFont   = UiFont ? UiFont : ImGui::GetFont();
+        const float tfs   = titleFont->LegacySize;
+        const float rfs   = rowFont->LegacySize;
+
+        // Title
         const char* titleText = "keybinds";
-        const ImVec2 titleSz = title->CalcTextSizeA(titleSize, FLT_MAX, 0.f, titleText);
-        dl->AddText(title, titleSize, ImVec2(p.x + (s.x - titleSz.x) * .5f, p.y + 5.f), soluswhite(), titleText);
+        ImVec2 tsz = titleFont->CalcTextSizeA(tfs, FLT_MAX, 0.f, titleText);
+        dl->AddText(titleFont, tfs, { p.x + (s.x - tsz.x) * .5f, p.y + 7.f },
+            IM_COL32(210, 215, 230, 220), titleText);
 
-        dl->AddText(title, titleSize, p + ImVec2(9.f, 25.f), soluswhite(.52f), "No binds");
+        // Separator
+        float sepY = p.y + 7.f + tfs + 5.f;
+        dl->AddLine({ p.x + 8.f, sepY }, { p.x + s.x - 8.f, sepY },
+            IM_COL32(255, 255, 255, 18), 1.f);
+
+        // Build bind list — every configured keybind
+        struct BindEntry { const char* label; ImGuiKey key; ImKeyBindMode mode; bool live; };
+        std::vector<BindEntry> entries;
+
+        auto check_live = [](ImGuiKey k, ImKeyBindMode m) -> bool {
+            if (k == ImGuiKey_None) return false;
+            if (m == ImKeyBindMode_Always) return true;
+            const int vk = virtualkey(k);
+            if (!vk) return false;
+            return (GetAsyncKeyState(vk) & 0x8000) != 0;
+        };
+
+        // Show every feature that has a key bound AND is enabled
+        if (global::aim::TriggerBot_Key != ImGuiKey_None && global::aim::TriggerBot)
+            entries.push_back({ "Triggerbot", global::aim::TriggerBot_Key, global::aim::TriggerBot_Mode,
+                check_live(global::aim::TriggerBot_Key, global::aim::TriggerBot_Mode) });
+        if (global::aimbot::Key != ImGuiKey_None && global::aimbot::Enabled)
+            entries.push_back({ "Aimbot", global::aimbot::Key, global::aimbot::Mode,
+                check_live(global::aimbot::Key, global::aimbot::Mode) });
+        if (global::silent::Enabled && global::silent::Silent_Key != ImGuiKey_None)
+            entries.push_back({ "Silent Aim", global::silent::Silent_Key, global::silent::Silent_Mode,
+                check_live(global::silent::Silent_Key, global::silent::Silent_Mode) });
+        if (global::esp::Enabled)
+            entries.push_back({ "ESP", global::setting::Menu_Key, ImKeyBindMode_Toggle, global::esp::Enabled });
+        if (global::misc::fly && global::misc::Fly_Key != ImGuiKey_None)
+            entries.push_back({ "Fly", global::misc::Fly_Key, global::misc::Fly_Mode,
+                check_live(global::misc::Fly_Key, global::misc::Fly_Mode) });
+        if (global::misc::Desync && global::misc::Desync_Key != ImGuiKey_None)
+            entries.push_back({ "Desync", global::misc::Desync_Key, global::misc::Desync_Mode,
+                check_live(global::misc::Desync_Key, global::misc::Desync_Mode) });
+        if (global::misc::Tickrate && global::misc::Tickrate_Key != ImGuiKey_None)
+            entries.push_back({ "Tickrate", global::misc::Tickrate_Key, global::misc::Tickrate_Mode,
+                check_live(global::misc::Tickrate_Key, global::misc::Tickrate_Mode) });
+        if (global::misc::AnimChanger && global::misc::AnimKey != ImGuiKey_None)
+            entries.push_back({ "Animation", global::misc::AnimKey, global::misc::AnimMode,
+                check_live(global::misc::AnimKey, global::misc::AnimMode) });
+        if (global::misc::ClockTime && global::misc::ClockKey != ImGuiKey_None)
+            entries.push_back({ "Lighting", global::misc::ClockKey, global::misc::ClockMode,
+                check_live(global::misc::ClockKey, global::misc::ClockMode) });
+        if (global::crosshair::Enabled)
+            entries.push_back({ "Crosshair", ImGuiKey_None, ImKeyBindMode_Always, true });
+        if (global::tracer::Enabled)
+            entries.push_back({ "Tracers", ImGuiKey_None, ImKeyBindMode_Always, true });
+
+        if (entries.empty()) {
+            dl->AddText(rowFont, rfs, p + ImVec2(10.f, sepY + 8.f),
+                IM_COL32(100, 100, 115, 160), "No binds set");
+            return;
+        }
+
+        float rowY = sepY + 8.f;
+        const float rowH = rfs + 6.f;
+        const float rowW = s.x - 18.f;
+
+        for (const auto& e : entries) {
+            if (e.key == ImGuiKey_None) continue;
+            hotkeyrow(dl, { p.x + 10.f, rowY }, rowW, e.label, e.key, e.mode, e.live);
+            rowY += rowH;
+            if (rowY + rowH > p.y + s.y - 6.f) break;
+        }
     }
 
     static float dot(const sdk::vector3& a, const sdk::vector3& b)
@@ -1877,12 +2194,83 @@ namespace hud
         solusdefaultplacement();
 
         if (global::overlay::watermark)
-            panel("##unknownware_watermark", global::overlay::Watermark_Pos, ImVec2(200.f, 40.f), movable, watermark);
-        if (global::overlay::hotkey)
+            panel("##unknownware_watermark", global::overlay::Watermark_Pos,
+                ImVec2(280.f, 30.f), movable, watermark);
+
+        if (global::overlay::hotkey && global::overlay::ShowKeybinds)
         {
-            const int rows = hotkeycount();
+            // Count actual entries to size panel correctly
+            int bindRows = 0;
+            if (global::aim::TriggerBot_Key != ImGuiKey_None && global::aim::TriggerBot) bindRows++;
+            if (global::aimbot::Key != ImGuiKey_None && global::aimbot::Enabled)         bindRows++;
+            if (global::silent::Enabled && global::silent::Silent_Key != ImGuiKey_None)  bindRows++;
+            if (global::esp::Enabled)                                                    bindRows++;
+            if (global::misc::fly && global::misc::Fly_Key != ImGuiKey_None)             bindRows++;
+            if (global::misc::Desync && global::misc::Desync_Key != ImGuiKey_None)       bindRows++;
+            if (global::misc::Tickrate && global::misc::Tickrate_Key != ImGuiKey_None)   bindRows++;
+            if (global::misc::AnimChanger && global::misc::AnimKey != ImGuiKey_None)     bindRows++;
+            if (global::misc::ClockTime && global::misc::ClockKey != ImGuiKey_None)      bindRows++;
+            if (global::crosshair::Enabled)                                              bindRows++;
+            if (global::tracer::Enabled)                                                 bindRows++;
+            bindRows = ImMax(1, bindRows);
+
+            const float rowH = (UiFont ? UiFont : ImGui::GetFont())->LegacySize + 6.f;
+            const float panelH = 36.f + bindRows * rowH;
             panel("##unknownware_hotkeys", global::overlay::Hotkeys_Pos,
-                ImVec2(142.f, 32.f + ImMax(1, rows) * 14.f), movable, hotkey);
+                ImVec2(190.f, panelH), movable, hotkey);
+        }
+
+        // ── Notifications panel (damage log) — only visible when menu is open ──
+        if (movable && global::overlay::Notifications && global::overlay::DamageLogs)
+        {
+            ImVec2& notif_pos = global::overlay::Notif_Pos;
+
+            // Clamp
+            const ImVec2 disp = ImGui::GetIO().DisplaySize;
+            const ImVec2 notif_size(220.f, 28.f);
+            notif_pos.x = ImClamp(notif_pos.x, 0.f, disp.x - notif_size.x);
+            notif_pos.y = ImClamp(notif_pos.y, 0.f, disp.y - notif_size.y);
+
+            constexpr float drawPad = 20.f;
+            ImGui::SetNextWindowPos(notif_pos - ImVec2(drawPad, drawPad), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(notif_size + ImVec2(drawPad * 2.f, drawPad * 2.f), ImGuiCond_Always);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.f, 0.f, 0.f, 0.f));
+
+            if (ImGui::Begin("##notif_anchor", nullptr,
+                ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBackground |
+                ImGuiWindowFlags_NoBringToFrontOnFocus))
+            {
+                ImVec2 p = ImGui::GetWindowPos() + ImVec2(drawPad, drawPad);
+                ImDrawList* ndl = ImGui::GetWindowDrawList();
+
+                ImGui::SetCursorScreenPos(p);
+                ImGui::InvisibleButton("##notif_drag", notif_size);
+                if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.f)) {
+                    notif_pos += ImGui::GetIO().MouseDelta;
+                }
+
+                // Header bar
+                const float R = 6.f;
+                ndl->AddRectFilled(p, p + notif_size, IM_COL32(12, 12, 17, 195), R);
+                ndl->AddRect(p, p + notif_size, IM_COL32(255, 255, 255, 20), R, 0, 1.f);
+                // Purple left bar (damage color)
+                ndl->AddRectFilled(p + ImVec2(0.f, R), p + ImVec2(2.5f, notif_size.y - R),
+                    IM_COL32(255, 75, 100, 180));
+                // Label
+                ImFont* lf = UiFont ? UiFont : ImGui::GetFont();
+                const char* lbl = "notifications";
+                ImVec2 lsz = lf->CalcTextSizeA(lf->LegacySize, FLT_MAX, 0.f, lbl);
+                ndl->AddText(lf, lf->LegacySize,
+                    p + ImVec2((notif_size.x - lsz.x) * .5f, (notif_size.y - lf->LegacySize) * .5f),
+                    IM_COL32(180, 185, 200, 200), lbl);
+            }
+            ImGui::End();
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar(2);
         }
     }
 }
@@ -2128,57 +2516,144 @@ void graphic::menu()
     dragMenu();
 
     DL->PushClipRect(WP - ImVec2(2.f, 2.f), WP + WS + ImVec2(2.f, 2.f), false);
-    DL->AddRectFilled(WP, WP + WS, IM_COL32(35, 35, 35, (int)(MenuAlpha * 255.f)));
-    if (Detail->IdaBgTexture)
-    {
+
+    // ── Ghost Sigil window chrome ─────────────────────────────────────────────
+    const float RAD = 12.f;
+
+    // Ambient glow layers behind the window
+    for (int i = 4; i >= 1; i--) {
+        const float sp    = (float)i * 8.f;
+        const float gAlph = (0.028f - i * 0.005f) * MenuAlpha;
+        DL->AddRectFilled(
+            WP - ImVec2(sp * .4f, sp * .3f),
+            WP + WS + ImVec2(sp * .4f, sp * .6f),
+            color::alpha(color::Accent, gAlph), RAD + sp);
+    }
+
+    // Main window fill — deep dark with subtle purple tint
+    DL->AddRectFilled(WP, WP + WS,
+        color::alpha(color::Win, MenuAlpha), RAD);
+
+    // Background texture (if present)
+    if (Detail->IdaBgTexture) {
         constexpr float idaTextureDim = 4096.f;
-        const ImVec2 uv0 = ImVec2(WP.x / idaTextureDim, WP.y / idaTextureDim);
-        const ImVec2 uv1 = ImVec2((WP.x + WS.x) / idaTextureDim, (WP.y + WS.y) / idaTextureDim);
-        DL->AddImage((ImTextureID)(intptr_t)Detail->IdaBgTexture,
+        const ImVec2 uv0 = { WP.x / idaTextureDim,          WP.y / idaTextureDim };
+        const ImVec2 uv1 = { (WP.x + WS.x) / idaTextureDim, (WP.y + WS.y) / idaTextureDim };
+        DL->AddImageRounded((ImTextureID)(intptr_t)Detail->IdaBgTexture,
             WP, WP + WS, uv0, uv1,
-            IM_COL32(255, 255, 255, (int)(MenuAlpha * 255.f)));
+            IM_COL32(255, 255, 255, (int)(MenuAlpha * 18.f)), RAD);
     }
-    const int outlineColors[6] = { 12, 61, 43, 43, 43, 61 };
-    for (int i = 0; i < 6; ++i)
+
+    // Inner top-highlight (specular)
+    DL->AddRectFilled(WP + ImVec2(RAD, 1.f),
+        WP + ImVec2(WS.x - RAD, 3.f),
+        IM_COL32(255, 255, 255, (int)(MenuAlpha * 18.f)), 1.f);
+
+    // Outer border
+    DL->AddRect(WP, WP + WS,
+        color::alpha(color::Border, MenuAlpha), RAD, 0, 1.f);
+
+    // Accent top-bar (2px)
+    DL->AddRectFilled(WP + ImVec2(RAD + 2.f, 0.f),
+        WP + ImVec2(WS.x - RAD - 2.f, 2.f),
+        color::alpha(color::Accent, MenuAlpha * .85f), 1.f);
+
+    // ── Sidebar background ────────────────────────────────────────────────────
+    DL->AddRectFilled(WP + ImVec2(1.f, 1.f),
+        WP + ImVec2(sbW - 1.f, WS.y - 1.f),
+        color::alpha(IM_COL32(255, 255, 255, 10), MenuAlpha),
+        RAD - 1.f, ImDrawFlags_RoundCornersLeft);
+    DL->AddLine(WP + ImVec2(sbW, kHeaderH),
+        WP + ImVec2(sbW, WS.y),
+        color::alpha(color::Divider, MenuAlpha), 1.f);
+
+    // ── Header background ─────────────────────────────────────────────────────
+    DL->AddRectFilled(WP + ImVec2(1.f, 1.f),
+        WP + ImVec2(WS.x - 1.f, kHeaderH),
+        color::alpha(IM_COL32(255, 255, 255, 12), MenuAlpha),
+        RAD - 1.f, ImDrawFlags_RoundCornersTop);
+    DL->AddLine(WP + ImVec2(sbW, kHeaderH),
+        WP + ImVec2(WS.x, kHeaderH),
+        color::alpha(color::Divider, MenuAlpha), 1.f);
+
+    // ── Logo ──────────────────────────────────────────────────────────────────
     {
-        const float inset = (float)i;
-        DL->AddRect(WP + ImVec2(inset, inset), WP + WS - ImVec2(inset, inset),
-            IM_COL32(outlineColors[i], outlineColors[i], outlineColors[i], (int)(MenuAlpha * 255.f)));
+        ImFont* lf   = LogoFont ? LogoFont : (Tahoma_BoldXP ? Tahoma_BoldXP : ImGui::GetFont());
+        const float ls = lf->LegacySize + 2.f;
+        const ImVec2 lp = WP + ImVec2(14.f, (kHeaderH - ls) * .5f);
+        DL->AddText(lf, ls, lp + ImVec2(.5f, .5f),
+            color::alpha(IM_COL32(0, 0, 0, 120), MenuAlpha), "rbx");
+        DL->AddText(lf, ls, lp,
+            color::alpha(color::text, MenuAlpha), "rbx");
+        // Accent dot
+        DL->AddCircleFilled(lp + ImVec2(ImGui::CalcTextSize("rbx").x + 4.f, ls * .45f),
+            2.5f, color::alpha(color::Accent, MenuAlpha), 8);
     }
 
-    DL->AddRectFilled(WP + ImVec2(6.f, 6.f), WP + ImVec2(WS.x - 6.f, 10.f), color::Surface);
-    const float stripeW = WS.x - 14.f;
-    const ImVec2 stripeMin = WP + ImVec2(7.f, 7.f);
-    DL->AddRectFilledMultiColor(stripeMin,
-        stripeMin + ImVec2(stripeW * .5f, 2.f),
-        color::StripeCyan, color::Purple, color::Purple, color::StripeCyan);
-    DL->AddRectFilledMultiColor(stripeMin + ImVec2(stripeW * .5f, 0.f),
-        stripeMin + ImVec2(stripeW, 2.f),
-        color::Purple, color::StripeLime, color::StripeLime, color::Purple);
-    DL->AddRectFilled(WP + ImVec2(7.f, 8.f), WP + ImVec2(WS.x - 7.f, 9.f), IM_COL32(0, 0, 0, 119));
-    DL->AddLine(WP + ImVec2(7.f, 9.f), WP + ImVec2(WS.x - 7.f, 9.f), IM_COL32(6, 6, 6, 255));
-
-    DL->AddRectFilled(WP + ImVec2(6.f, 10.f), WP + ImVec2(80.f, 19.f), color::Surface);
-    DL->AddLine(WP + ImVec2(80.f, 10.f), WP + ImVec2(80.f, 19.f), color::Border);
-    DL->AddLine(WP + ImVec2(79.f, 10.f), WP + ImVec2(79.f, 19.f), IM_COL32(0, 0, 0, 255));
-
-    DL->AddRectFilled(WP + ImVec2(6.f, 546.f), WP + ImVec2(80.f, WS.y - 6.f), color::Surface);
-    DL->AddLine(WP + ImVec2(80.f, 546.f), WP + ImVec2(80.f, WS.y - 6.f), color::Border);
-    DL->AddLine(WP + ImVec2(79.f, 547.f), WP + ImVec2(79.f, WS.y - 6.f), IM_COL32(0, 0, 0, 255));
     DL->PopClipRect();
 
     using Fn = void(*)(ImDrawList*, ImVec2, float, ImU32);
-    constexpr Fn icons[] = { icon::crosshair, icon::diamond, icon::globe, icon::eye, icon::layer, icon::diamond, icon::layer, icon::gear };
-    constexpr const char* labels[] = { "Triggerbot", "Aimbot", "World", "Visuals", "Misc", "Blade Ball", "Players", "Settings" };
+    constexpr Fn icons[] = { icon::crosshair, icon::diamond, icon::crosshair, icon::eye, icon::layer, icon::diamond, icon::layer, icon::gear };
+    constexpr const char* labels[] = { "Triggerbot", "Aimbot", "Silent", "Visuals", "Misc", "Games", "Players", "Settings" };
     constexpr int kTabs = 8;
 
     const float tabY = 19.f;
 
-    for (int i = 0; i < kTabs; i++)
+    // ── Ghost Sigil sliding pill nav ──────────────────────────────────────────
     {
-        if (side::tab(DL, WP, tabY, sbW, compact, i, Section, kTabs, icons[i], labels[i]))
-            Section = i;
+        const float TAB_H   = 44.f;
+        const float TAB_PAD = 8.f;
+        const float TPX     = 8.f;
+        const float startY  = kHeaderH + 8.f;
+
+        // Animated active pill position
+        static float s_pill_y = startY;
+        const float  pill_target = startY + Section * (TAB_H + 4.f);
+        s_pill_y = fx::damp(s_pill_y, pill_target, 20.f);
+
+        // Draw pill
+        const ImVec2 pillMin = WP + ImVec2(TPX, s_pill_y);
+        const ImVec2 pillMax = WP + ImVec2(sbW - TPX, s_pill_y + TAB_H);
+        DL->AddRectFilled(pillMin, pillMax,
+            color::alpha(color::AccentDim, MenuAlpha * .6f), 10.f);
+        DL->AddRect(pillMin, pillMax,
+            color::alpha(color::Accent, MenuAlpha * .55f), 10.f, 0, 1.f);
+
+        // Draw each tab
+        for (int i = 0; i < kTabs; i++) {
+            const float ty    = startY + i * (TAB_H + 4.f);
+            const ImVec2 tMin = WP + ImVec2(TPX, ty);
+            const ImVec2 tMax = WP + ImVec2(sbW - TPX, ty + TAB_H);
+            const ImVec2 ctr  = { tMin.x + (sbW - TPX * 2.f) * .5f, tMin.y + TAB_H * .5f };
+
+            const bool hov = ImGui::IsMouseHoveringRect(tMin, tMax);
+            if (hov && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                Section = i;
+
+            // Hover tint
+            if (hov && i != Section)
+                DL->AddRectFilled(tMin, tMax,
+                    color::alpha(IM_COL32(255,255,255,8), MenuAlpha), 10.f);
+
+            // Icon
+            const bool  active  = (i == Section);
+            const float iconSz  = 20.f;
+            const float iconAlp = active ? MenuAlpha : MenuAlpha * (hov ? 0.65f : 0.38f);
+            const ImU32 iconCol = color::alpha(active ? color::AccentFg : color::text, iconAlp);
+            if (icons[i])
+                icons[i](DL, ctr - ImVec2(0.f, 6.f), iconSz, iconCol);
+
+            // Label
+            const ImVec2 lblSz = ImGui::CalcTextSize(labels[i]);
+            DL->AddText({ ctr.x - lblSz.x * .5f, ctr.y + 6.f },
+                color::alpha(active ? color::AccentFg : color::TextMid,
+                    MenuAlpha * (active ? 1.f : 0.5f)),
+                labels[i]);
+        }
     }
+
+    // Keep for_loop compat with old code that reads Section via side::tab
+    for (int i = 0; i < kTabs; i++) { (void)i; }
 
     if (LastSection != Section)
     {
@@ -2300,14 +2775,103 @@ void graphic::menu()
     }
 
 
-    if (Section == 1) {}
-    if (Section == 2) {}
+    if (Section == 1)
+    {
+        if (ui::card::begin("##ab", { halfW, bInH }, "AIMBOT"))
+        {
+            ui::toggle("Enabled", &global::aimbot::Enabled);
+            ImGui::SameLine(ui::rightslot(ui::bindwidth(global::aimbot::Key, global::aimbot::Mode), 4.f));
+            ui::bind("##abk", &global::aimbot::Key, &global::aimbot::Mode);
+
+            ui::gap(4.f);
+            ui::toggle("Auto Sensitivity", &global::aimbot::AutoSens);
+            if (!global::aimbot::AutoSens) {
+                ui::sliderfloat("Smoothing",  &global::aimbot::Smoothing, 1.f, 30.f);
+                ui::sliderfloat("Speed",      &global::aimbot::Speed,     0.1f, 20.f);
+                ui::combo("Ease In",  &global::aimbot::SmoothEaseIn,  { "Linear","Ease-Out Cubic","Ease-Out Quint" });
+                ui::combo("Ease Out", &global::aimbot::SmoothEaseOut, { "Linear","Ease-Out Cubic","Ease-Out Quint" });
+            }
+            ui::sliderfloat("FOV", &global::aimbot::FOV, 1.f, 360.f);
+            ui::combo("Priority", &global::aimbot::TargetPriority, { "Crosshair", "Distance", "Health" });
+            ui::combo("Hitbox",   &global::aimbot::Hitbox, { "Head","Torso","Upper Torso","Lower Torso","Root","Random" });
+            ui::toggle("Prediction",    &global::aimbot::Prediction);
+            ui::toggle("Auto Shoot",    &global::aimbot::AutoShoot);
+            ui::toggle("Visible Check", &global::aimbot::VisibleCheck);
+            ui::toggle("Dead Check",    &global::aimbot::DeadCheck);
+            ui::toggle("Team Check",    &global::aimbot::TeamCheck);
+            ui::toggle("Sticky Aim",    &global::aimbot::Sticky);
+        }
+        ui::card::end();
+
+        ImGui::SameLine(0.f, 6.f);
+
+        if (ui::card::begin("##ablegit", { halfW, bInH }, "LEGIT / MISC"))
+        {
+            ui::gap(2.f);
+            ui::labelsection("HUMANISE");
+            ui::sliderfloat("Jitter",        &global::aimbot::Jitter,     0.f, 10.f);
+            ui::sliderfloat("Random FOV",    &global::aimbot::RandomFOV,  0.f, 90.f);
+            ui::sliderint("Reaction (ms)",   &global::aimbot::ReactionMs, 0,   500);
+            ui::gap(4.f);
+            ui::labelsection("CHECKS");
+            ui::toggle("Legit Mode",  &global::aimbot::Legit);
+        }
+        ui::card::end();
+    }
+    if (Section == 2)
+    {
+        if (ui::card::begin("##sa", { halfW, bInH }, "SILENT AIM"))
+        {
+            ui::toggle("Enable", &global::silent::Enabled);
+            ImGui::SameLine(ui::rightslot(ui::bindwidth(global::silent::Silent_Key, global::silent::Silent_Mode), 4.f));
+            ui::bind("##sak", &global::silent::Silent_Key, &global::silent::Silent_Mode);
+
+            ui::gap(4.f);
+            ui::toggle("Visible Check",  &global::silent::VisibleCheck);
+            ui::toggle("Knocked Check",  &global::silent::KnockedCheck);
+            ui::toggle("Use FOV",        &global::silent::UseFov);
+            if (global::silent::UseFov)
+                ui::sliderfloat("FOV", &global::silent::fov, 1.f, 500.f);
+            ui::toggle("Gun-Based FOV",  &global::silent::GunBasedFov);
+            ui::combo("Aim Part", &global::silent::AimPart, { "Head","Upper Torso","Lower Torso" });
+            ui::combo("Priority", &global::silent::TargetPriority, { "Crosshair","Distance" });
+            ui::gap(4.f);
+            ui::labelsection("PREDICTION");
+            ui::toggle("Prediction",      &global::silent::Prediction);
+            if (global::silent::Prediction) {
+                ui::toggle("Auto Predict", &global::silent::AutoPrediction);
+                if (!global::silent::AutoPrediction) {
+                    ui::sliderfloat("X", &global::silent::PredictionX, 0.f, 0.5f, "%.3f");
+                    ui::sliderfloat("Y", &global::silent::PredictionY, 0.f, 0.5f, "%.3f");
+                    ui::sliderfloat("Z", &global::silent::PredictionZ, 0.f, 0.5f, "%.3f");
+                }
+            }
+        }
+        ui::card::end();
+
+        ImGui::SameLine(0.f, 6.f);
+
+        if (ui::card::begin("##mb", { halfW, bInH }, "MAGIC BULLET"))
+        {
+            ui::toggle("Enable", &global::silent::MagicBullet);
+            ui::gap(4.f);
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                ImGui::ColorConvertU32ToFloat4(color::TextMid));
+            ImGui::TextWrapped(
+                "Redirects Lua GC ray userdatas toward the "
+                "closest target each frame. Works independently "
+                "of silent aim.");
+            ImGui::PopStyleColor();
+        }
+        ui::card::end();
+    }
 
     if (Section == 3)
     {
         if (ui::card::begin("##esp", { halfW, bInH }, "ESP TOGGLES"))
         {
             ui::toggle("Master Enable", &global::esp::Enabled);
+            ui::toggle("Local Player",  &global::esp::Local_Player);
             ui::toggle("Visible Check", &global::esp::VisibleCheck);
             if (global::esp::VisibleCheck) {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(color::TextMid), "Visible");
@@ -2315,6 +2879,7 @@ void graphic::menu()
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(color::TextMid), "Not Visible");
                 ui::color4("##espnotvisc", global::esp::color::NotVisible);
             }
+            ui::toggle("Dead Check", &global::esp::Dead_Check);
             ui::gap(4.f);
 
             ui::labelsection("BOX");
@@ -2390,22 +2955,324 @@ void graphic::menu()
         {
             ui::toggle("Exclude Team", &global::setting::Team_Check);
             ui::toggle("Exclude Client", &global::setting::Client_Check);
+            ui::toggle("Bot Check", &global::setting::BotCheck);
             ui::gap(4.f);
             ui::labelsection("RENDERING");
-            ui::sliderfloat("Render Distance", &global::esp::Render_Distance, 0.f, 500.f);
+            ui::toggle("Limit Render Distance", &global::esp::Limit_Distance);
+            if (global::esp::Limit_Distance)
+                ui::sliderfloat("Render Distance", &global::esp::Render_Distance, 0.f, 50000.f);
             ui::gap(4.f);
             ui::labelsection("OVERLAY");
             ui::toggle("Watermark", &global::overlay::watermark);
+            ui::toggle("Keybinds", &global::overlay::ShowKeybinds);
             ui::toggle("Damage Logs", &global::overlay::DamageLogs);
+            ui::toggle("Notifications", &global::overlay::Notifications);
+            ui::sliderfloat("Media Tracker", &global::overlay::Spotify, 0.f, 1.f);
             if (global::esp::aimline)
                 ui::sliderfloat("AimView Length", &global::overlay::AimView_MaxLength, 50.f, 1000.f);
+
+            ui::gap(4.f);
+            ui::labelsection("TRACERS");
+            ui::toggle("Tracers", &global::tracer::Enabled);
+            if (global::tracer::Enabled) {
+                ui::combo("Style",  &global::tracer::Style,  { "Straight","Curved","Dashed" });
+                ui::combo("Origin", &global::tracer::Origin, { "Cursor","Center","Top","Bottom","My Head","My HRP" });
+                ui::combo("Target", &global::tracer::Dest,   { "Head","Root","Closest","My Head (cursor follow)" });
+                ui::sliderfloat("Thickness##tr", &global::tracer::Thickness, 0.5f, 5.f, "%.1f");
+                ui::toggle("Outline##tr", &global::tracer::Outline);
+                ui::color4("##trc", global::tracer::Color);
+            }
         }
         ui::card::end();
     }
 
-    if (Section == 4) {}
-    if (Section == 5) {}
-    if (Section == 6) {}
+    if (Section == 4)
+    {
+        if (ui::card::begin("##misc", { halfW, bInH }, "MISC"))
+        {
+            ui::labelsection("MOVEMENT");
+            ui::toggle("Fly", &global::misc::fly);
+            ImGui::SameLine(ui::rightslot(ui::bindwidth(global::misc::Fly_Key, global::misc::Fly_Mode), 4.f));
+            ui::bind("##flyk", &global::misc::Fly_Key, &global::misc::Fly_Mode);
+            if (global::misc::fly)
+                ui::sliderfloat("Fly Speed", &global::misc::Fly_Speed, 5.f, 200.f);
+
+            ui::gap(4.f);
+            ui::toggle("Walkspeed", &global::misc::walkspeed);
+            if (global::misc::walkspeed)
+                ui::sliderfloat("Speed", &global::misc::Walkspeed_Speed, 1.f, 500.f, "%.0f");
+
+            ui::gap(4.f);
+            ui::labelsection("HITBOX");
+            ui::toggle("Expand Hitbox", &global::misc::hitbox);
+            if (global::misc::hitbox) {
+                ui::sliderfloat("Size X", &global::misc::Hitbox_Size_X, 1.f, 75.f, "%.1f");
+                ui::sliderfloat("Size Y", &global::misc::Hitbox_Size_Y, 1.f, 75.f, "%.1f");
+                ui::sliderfloat("Size Z", &global::misc::Hitbox_Size_Z, 1.f, 75.f, "%.1f");
+            }
+
+            ui::gap(4.f);
+            ui::labelsection("DESYNC");
+            ui::toggle("Desync", &global::misc::Desync);
+            ImGui::SameLine(ui::rightslot(ui::bindwidth(global::misc::Desync_Key, global::misc::Desync_Mode), 4.f));
+            ui::bind("##dsk", &global::misc::Desync_Key, &global::misc::Desync_Mode);
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                ImGui::ColorConvertU32ToFloat4(color::TextMid));
+            ImGui::TextWrapped("Sets PhysicsSenderJob bandwidth to 0 "
+                "while held/toggled. Restores for 3s on release.");
+            ImGui::PopStyleColor();
+
+            ui::gap(4.f);
+            ui::labelsection("TICKRATE");
+            ui::toggle("Override Tickrate", &global::misc::Tickrate);
+            if (global::misc::Tickrate) {
+                ImGui::SameLine(ui::rightslot(ui::bindwidth(global::misc::Tickrate_Key, global::misc::Tickrate_Mode), 4.f));
+                ui::bind("##tck", &global::misc::Tickrate_Key, &global::misc::Tickrate_Mode);
+                ui::sliderfloat("Rate", &global::misc::Tickrate_Value, 1.f, 240.f, "%.0f");
+            }
+
+            ui::gap(4.f);
+            ui::labelsection("ANIMATION");
+            ui::toggle("Anim Changer", &global::misc::AnimChanger);
+            if (global::misc::AnimChanger) {
+                ImGui::SameLine(ui::rightslot(ui::bindwidth(global::misc::AnimKey, global::misc::AnimMode), 4.f));
+                ui::bind("##ank", &global::misc::AnimKey, &global::misc::AnimMode);
+                // Build combo from pack names
+                int pack_count = 0;
+                const char** names = misc::anim_pack_names(&pack_count);
+                std::vector<const char*> pack_list(names, names+pack_count);
+                ui::combo("Pack", &global::misc::AnimPack, pack_list);
+            }
+
+            ui::gap(4.f);
+            ui::labelsection("LIGHTING");
+            ui::toggle("Lighting Override", &global::misc::Lighting);
+            if (global::misc::Lighting) {
+                ui::toggle("Clock Time", &global::misc::ClockTime);
+                if (global::misc::ClockTime) {
+                    ImGui::SameLine(ui::rightslot(ui::bindwidth(global::misc::ClockKey, global::misc::ClockMode), 4.f));
+                    ui::bind("##clk", &global::misc::ClockKey, &global::misc::ClockMode);
+                    // Display as hours 0-24
+                    float hours = global::misc::ClockTimeValue / 3600.f;
+                    if (ui::sliderfloat("Clock Hour", &hours, 0.f, 24.f, "%.1f"))
+                        global::misc::ClockTimeValue = hours * 3600.f;
+                }
+            }
+        }
+        ui::card::end();
+
+        ImGui::SameLine(0.f, 6.f);
+
+        if (ui::card::begin("##crosstracer", { halfW, bInH }, "CROSSHAIR"))
+        {
+            ui::toggle("Enable", &global::crosshair::Enabled);
+            if (global::crosshair::Enabled) {
+                ui::combo("Type",     &global::crosshair::Type,     { "Static","Animated","Spin" });
+                ui::combo("Position", &global::crosshair::Position, { "Follow Cursor","Screen Center" });
+                if (global::crosshair::Type == 2)
+                    ui::sliderfloat("Spin Speed", &global::crosshair::SpinSpeed, 0.1f, 10.f, "%.1f");
+                ui::sliderfloat("Size",      &global::crosshair::Size,      2.f,  40.f, "%.0f");
+                ui::sliderfloat("Gap",       &global::crosshair::Gap,       0.f,  20.f, "%.0f");
+                ui::sliderfloat("Thickness", &global::crosshair::Thickness, 0.5f,  5.f, "%.1f");
+                ui::toggle("Outline", &global::crosshair::Outline);
+                ui::color4("##xhc", global::crosshair::Color);
+            }
+        }
+        ui::card::end();
+    }
+    if (Section == 5)
+    {
+        // ── Game Selector ──────────────────────────────────────────────────
+        struct GameEntry {
+            const char* name;
+            const char* desc;
+            const char* placeId;
+            ImU32       accent;
+        };
+        static const GameEntry games[] = {
+            { "Da Hood",       "Street RP / PVP",  "2788229376",  IM_COL32(220, 60,  60,  255) },
+            { "DUELIST: PVP",  "1v1 Sword Combat", "17625359955", IM_COL32( 80, 160, 255, 255) },
+        };
+        static int hovered_game = -1;
+
+        if (ui::card::begin("##gs", { bInW, bInH }, "GAME SELECTOR"))
+        {
+            ui::labelsection("FEATURED GAMES");
+            ui::gap(4.f);
+
+            const float cardW = bInW - ui::kCardPadX * 2.f;
+            const float cardH = 64.f;
+            const float cardGap = 8.f;
+
+            ImDrawList* cdl = ImGui::GetWindowDrawList();
+
+            for (int i = 0; i < 2; i++)
+            {
+                const GameEntry& g = games[i];
+                ImVec2 cp = ImGui::GetCursorScreenPos();
+                ImVec2 cm = { cp.x + cardW, cp.y + cardH };
+
+                ImGui::PushID(i);
+                ImGui::InvisibleButton("##gc", { cardW, cardH });
+                bool ghov = ImGui::IsItemHovered();
+                bool gclk = ImGui::IsItemClicked();
+                ImGui::PopID();
+
+                // Smooth hover
+                static float ghov_t[2] = {};
+                ghov_t[i] = fx::damp(ghov_t[i], ghov ? 1.f : 0.f, 14.f);
+                float gt = ghov_t[i];
+
+                // Card bg
+                ImU32 cbg = color::lerp(color::card, color::CardHov, gt);
+                cdl->AddRectFilled(cp, cm, cbg, 8.f);
+
+                // Left accent bar
+                cdl->AddRectFilled(cp + ImVec2(0.f, 6.f),
+                    cp + ImVec2(3.f, cardH - 6.f),
+                    color::alpha(g.accent, 0.55f + gt * 0.45f), 2.f);
+
+                // Glow on hover
+                if (gt > 0.01f)
+                    cdl->AddRect(cp, cm,
+                        color::alpha(g.accent, gt * 0.35f), 8.f, 0, 1.5f);
+                else
+                    cdl->AddRect(cp, cm, color::Border, 8.f, 0, 1.f);
+
+                // Game name
+                cdl->AddText(cp + ImVec2(14.f, 14.f),
+                    color::lerp(color::text, color::White, gt), g.name);
+
+                // Description
+                cdl->AddText(cp + ImVec2(14.f, 14.f + ImGui::GetFontSize() + 4.f),
+                    color::alpha(color::TextMid, 0.8f), g.desc);
+
+                // Launch button (appears on hover)
+                if (gt > 0.05f)
+                {
+                    const float btnW = 70.f, btnH = 22.f;
+                    ImVec2 bp = { cm.x - btnW - 10.f, cp.y + (cardH - btnH) * .5f };
+                    ImVec2 bm = bp + ImVec2(btnW, btnH);
+
+                    ImU32 btnBg  = color::alpha(g.accent, 0.20f + gt * 0.25f);
+                    ImU32 btnBrd = color::alpha(g.accent, 0.50f + gt * 0.40f);
+                    cdl->AddRectFilled(bp, bm, btnBg, 6.f);
+                    cdl->AddRect(bp, bm, btnBrd, 6.f, 0, 1.f);
+
+                    const char* btnLbl = "Launch";
+                    ImVec2 ls = ImGui::CalcTextSize(btnLbl);
+                    cdl->AddText(bp + ImVec2((btnW - ls.x) * .5f, (btnH - ls.y) * .5f),
+                        color::alpha(color::White, gt), btnLbl);
+
+                    // Click → open Roblox deeplink
+                    if (gclk)
+                    {
+                        char link[128];
+                        std::snprintf(link, sizeof(link),
+                            "roblox://placeId=%s", g.placeId);
+                        ShellExecuteA(nullptr, "open", link, nullptr, nullptr, SW_SHOWNORMAL);
+                    }
+                }
+
+                ImGui::SetCursorScreenPos({ cp.x, cm.y + cardGap });
+            }
+
+            ui::gap(12.f);
+            ui::labelsection("INFO");
+            ui::gap(4.f);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(color::TextMid));
+            ImGui::TextWrapped("Select a game above to launch it directly in Roblox. "
+                               "More games will be added in future updates.");
+            ImGui::PopStyleColor();
+        }
+        ui::card::end();
+    }
+    if (Section == 6)
+    {
+        static int sel = -1;
+        std::vector<sdk::player> players;
+        try { players = cache::snapshot(); } catch (...) {}
+
+        if (ui::card::begin("##plist", { halfW, bInH }, "PLAYERS"))
+        {
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(color::Win));
+            ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(color::Border));
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.f);
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.f);
+            ImGui::BeginChild("##plc", ImGui::GetContentRegionAvail(), true);
+            for (int i = 0; i < (int)players.size(); i++)
+            {
+                auto& p = players[i];
+                ImGui::PushStyleColor(ImGuiCol_Header, ImGui::ColorConvertU32ToFloat4(color::AccentDim));
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGui::ColorConvertU32ToFloat4(color::AccentDim));
+                ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGui::ColorConvertU32ToFloat4(color::Accent));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(sel == i ? color::AccentFg : color::TextMid));
+                char label[64];
+                std::snprintf(label, sizeof(label), "%s [%.0fm]", p.name.c_str(), p.Distance);
+                if (ImGui::Selectable(label, sel == i))
+                    sel = i;
+                ImGui::PopStyleColor(4);
+            }
+            ImGui::EndChild();
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor(2);
+        }
+        ui::card::end();
+
+        ImGui::SameLine(0.f, 6.f);
+
+        if (ui::card::begin("##pdetail", { halfW, bInH }, "DETAILS"))
+        {
+            if (sel >= 0 && sel < (int)players.size())
+            {
+                auto& p = players[sel];
+                try {
+                    ImGui::Text("Name: %s", p.name.c_str());
+                    ImGui::Text("Display: %s", p.Display_Name.c_str());
+                    if (p.UserID) ImGui::Text("UserID: %llu", (unsigned long long)p.UserID);
+                    ImGui::Text("Health: %.0f / %.0f", p.Health, p.MaxHealth);
+                    ImGui::Text("Distance: %.0fm", p.Distance);
+                    ImGui::Text("Character: 0x%llX", (unsigned long long)p.character.Address);
+
+                    if (p.character.Address)
+                    {
+                        ImGui::Separator();
+                        ImGui::Text("BODY PARTS:");
+                        auto print_part = [&](const char* label, const sdk::instance& inst) {
+                            ImGui::Text("  %s: 0x%llX %s", label, (unsigned long long)inst.Address,
+                                inst.Address ? "OK" : "MISSING");
+                        };
+                        print_part("Head", p.Head);
+                        print_part("Torso", p.Torso);
+                        print_part("UpperTorso", p.UpperTorso);
+                        print_part("LowerTorso", p.LowerTorso);
+                        print_part("HumanoidRootPart", p.HumanoidRootPart);
+                        print_part("Humanoid", p.humanoid);
+
+                        ImGui::Separator();
+                        ImGui::Text("CHARACTER CHILDREN:");
+                        auto chars = p.character.children();
+                        for (auto& c : chars)
+                        {
+                            if (!c.Address) continue;
+                            ImGui::Text("  0x%llX %s (%s)", (unsigned long long)c.Address,
+                                c.name().c_str(), c.kind().c_str());
+                        }
+                    }
+                    else
+                    {
+                        ImGui::TextColored(ImVec4(1,0,0,1), "No character address!");
+                    }
+                }
+                catch (...) { ImGui::TextColored(ImVec4(1,0,0,1), "Error reading player data"); }
+            }
+            else
+            {
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(color::TextMid), "Select a player from the list");
+            }
+        }
+        ui::card::end();
+    }
 
     if (Section == 7)
     {
@@ -2642,6 +3509,35 @@ void graphic::menu()
             ImGui::SameLine(ui::rightslot(ui::kColW));
             ui::color4("##thtext", global::setting::color::text);
 
+            static bool dbg = false;
+            ui::gap(4.f);
+            if (ImGui::TreeNodeEx("Diagnostics", ImGuiTreeNodeFlags_SpanAvailWidth))
+            {
+                ImGui::Text("Actors:  0x%llX", (unsigned long long)global::actor.Address);
+                ImGui::Text("Camera:  0x%llX", (unsigned long long)global::camera.Address);
+                ImGui::Text("Render:  0x%llX", (unsigned long long)global::render.Address);
+                ImGui::Text("Local:   0x%llX", (unsigned long long)global::LocalPlayer.character.Address);
+                ImGui::Text("GameID:  %llu", (unsigned long long)global::GameID);
+                {
+                    auto snap = cache::snapshot();
+                    ImGui::Text("Players: %zu", snap.size());
+                }
+                ImGui::Text("Workspc: 0x%llX", (unsigned long long)global::workspace.Address);
+                ImGui::Separator();
+                auto& gp = game::get();
+                if (gp.source == game::Profile::WORKSPACE)
+                    ImGui::Text("Cache:   Workspace");
+                else if (gp.source == game::Profile::STANDARD)
+                    ImGui::Text("Cache:   Standard");
+                else
+                    ImGui::Text("Cache:   None");
+                ImGui::Text("Rig:     %s", gp.is_r15 ? "R15" : gp.is_r6 ? "R6" : gp.has_custom_rig ? "Custom" : "?");
+                ImGui::Text("Dead:    %s", gp.dead_uses_bodyeffects ? "BodyEffects>K.O" : "Humanoid.Health");
+                ImGui::Text("Teams:   %s", gp.has_teams ? "Yes" : "No");
+                ImGui::Text("Hitbox Parts: %d", gp.hitbox_part_count);
+                ImGui::TreePop();
+            }
+
             const float remaining = ImGui::GetContentRegionAvail().y - 34.f;
             if (remaining > 0.f) ImGui::Dummy({ 0.f, remaining });
 
@@ -2740,7 +3636,19 @@ void graphic::visual()
         }
     }
 
+    media::render();
     hud::render(Running);
     notify::render();
     welcome(Running);
+
+    // Crosshair + Tracers drawn on foreground
+    {
+        ImDrawList* fdl = ImGui::GetForegroundDrawList();
+        esp::crosshair(fdl);
+        {
+            std::vector<sdk::player> snap;
+            try { snap = cache::snapshot(); } catch(...) {}
+            esp::tracers(fdl, snap);
+        }
+    }
 }

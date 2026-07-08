@@ -130,8 +130,12 @@
     <ClCompile Include="src\engine\view.cpp" />
     <ClCompile Include="src\feature\aim.cpp" />
     <ClCompile Include="src\feature\cache.cpp" />
+    <ClCompile Include="src\feature\game.cpp" />
     <ClCompile Include="src\feature\esp.cpp" />
+    <ClCompile Include="src\feature\misc.cpp" />
+    <ClCompile Include="src\feature\silent.cpp" />
     <ClCompile Include="src\feature\wallcheck.cpp" />
+    <ClCompile Include="src\feature\media.cpp" />
     <ClCompile Include="src\ui\graphic.cpp" />
     <ClCompile Include="src\ui\idalovesme\ida_fonts.cpp" />
     <ClCompile Include="src\ui\idalovesme\ida_textures.cpp" />

@@ -1,0 +1,4 @@
+// UWLoader resource file
+// Embeds rbx-external.exe — the Build\ dir is added via /I in the vcxproj
+#define IDR_MAINEXE 101
+IDR_MAINEXE RCDATA "rbx-external.exe"

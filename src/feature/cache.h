@@ -76,3 +76,16 @@ namespace cache
 {
     std::vector<sdk::player> snapshot();
 }
+
+inline bool is_bot(const std::string& name)
+{
+    std::string lower = name;
+    for (auto& c : lower)
+        if (c >= 'A' && c <= 'Z') c += 32;
+
+    const char* patterns[] = { "bot", "npc", "ai_" };
+    for (auto pat : patterns)
+        if (lower.find(pat) != std::string::npos)
+            return true;
+    return false;
+}

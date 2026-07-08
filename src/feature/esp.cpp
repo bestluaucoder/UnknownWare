@@ -685,10 +685,13 @@ namespace esp {
             if (player.RightLeg.Address) Parts.push_back(&player.RightLeg);
         }
         else {
+            // Fallback to Bones array for custom character models
             for (const auto& Bone : player.Bones) {
                 if (Bone.Address)
                     Parts.push_back(&Bone);
             }
+            
+            // If Bones is also empty, try any available standard parts
             if (Parts.empty()) {
                 if (player.HumanoidRootPart.Address) Parts.push_back(&player.HumanoidRootPart);
                 if (player.Head.Address)             Parts.push_back(&player.Head);
@@ -729,24 +732,57 @@ namespace esp {
             if (Local.character.Address && player.character.Address == Local.character.Address)
                 continue;
 
-            if (global::esp::Render_Distance > 0.f && player.Distance > global::esp::Render_Distance)
+            if (global::esp::Limit_Distance && player.Distance > global::esp::Render_Distance)
                 continue;
 
-            if (global::aim::DeadCheck)
+            if (global::aim::DeadCheck || global::esp::Dead_Check)
             {
+                bool isDead = false;
+
+                // Method 1: game-specific K.O flag in BodyEffects
                 sdk::instance BodyEffects = player.character.child("BodyEffects");
                 if (BodyEffects.Address)
                 {
                     sdk::instance Ko = BodyEffects.child("K.O");
                     if (Ko.Address && drive->read<bool>(Ko.Address + offset::misc::Value))
-                        continue;
+                        isDead = true;
                 }
+
+                // Method 2: humanoid health (always check, not just fallback)
+                if (!isDead && player.humanoid.Address)
+                {
+                    sdk::humanoid hum(player.humanoid.Address);
+                    if (hum.health() <= 0.f)
+                        isDead = true;
+                }
+
+                // Method 3: cached health from last update
+                if (!isDead && player.MaxHealth > 0.f && player.Health <= 0.f)
+                    isDead = true;
+
+                if (isDead) continue;
             }
 
-            sdk::part Head(player.Head.Address);
-            if (!Head.Address) continue;
+            std::uintptr_t head_addr = 0;
+            
+            // Null safety: try multiple fallbacks for head position
+            if (player.Head.Address) {
+                head_addr = player.Head.Address;
+            }
+            else if (player.HumanoidRootPart.Address) {
+                head_addr = player.HumanoidRootPart.Address;
+            }
+            else if (player.UpperTorso.Address) {
+                head_addr = player.UpperTorso.Address;
+            }
+            else if (player.Torso.Address) {
+                head_addr = player.Torso.Address;
+            }
+            
+            if (!head_addr) continue;
 
-            const sdk::part HeadPrimitive = Head.primitive();
+            sdk::part Head(head_addr);
+            auto HeadPrimitive = Head.primitive();
             if (!HeadPrimitive.Address)
                 continue;
 
@@ -764,10 +800,10 @@ namespace esp {
             bool valid = false;
 
             auto Bones = esp::bone(player);
-            if (Bones.empty()) continue;
+            if (Bones.empty()) continue;  // Null safety: skip if no bones available
 
             for (auto* Inst : Bones) {
-                if (!Inst || !Inst->Address) continue;
+                if (!Inst || !Inst->Address) continue;  // Additional null check
 
                 const auto part = sdk::part(Inst->Address);
                 const auto primitive = part.primitive();
@@ -776,22 +812,18 @@ namespace esp {
                 const auto Position = primitive.position();
                 const auto Rotation = primitive.rotation();
 
-                if (global::GameID == 292439477)
-                {
-                    std::string name = part.name();
-                    if (name.find("Other_") != std::string::npos) {
-                        Size = { 1.f, 2.f, 1.f };
-                    }
-                    else if (name == "Head") {
-                        Size = { 1.f, 1.f, 1.f };
-                    }
-                    else if (name == "Torso") {
-                        Size = { 2.f, 2.f, 1.f };
-                    }
-                }
-
                 if (Size.x == 0.f && Size.y == 0.f && Size.z == 0.f)
-                    continue;
+                {
+                    std::string pname = part.name();
+                    if (pname.find("Head") != std::string::npos || pname.find("head") != std::string::npos)
+                        Size = { 1.f, 1.f, 1.f };
+                    else if (pname.find("Torso") != std::string::npos || pname.find("torso") != std::string::npos)
+                        Size = { 2.f, 2.f, 1.f };
+                    else if (pname.find("Other_") != std::string::npos)
+                        Size = { 1.f, 2.f, 1.f };
+                    else
+                        continue;
+                }
 
                 for (const auto& LocalCorners : Corners) {
                     sdk::vector3 Offset{
@@ -853,8 +885,8 @@ namespace esp {
                 }
             }
 
-            if (global::esp::Chinese_Hat)
-                style::hat(Draw, Head);
+            if (global::esp::Chinese_Hat && player.Head.Address)
+                style::hat(Draw, sdk::part(player.Head.Address));
 
             if (global::esp::Healthbar) {
                 float Ratio = (player.MaxHealth > 0.f) ? player.Health / player.MaxHealth : 0.f;
@@ -1072,8 +1104,10 @@ namespace esp {
                             if (!Instances[i].Address) { DrawPoly(ScreenPoints, ValidCount); ValidCount = 0; continue; }
                             sdk::part part(Instances[i].Address);
                             if (!part.Address) { DrawPoly(ScreenPoints, ValidCount); ValidCount = 0; continue; }
+                            auto prim = part.primitive();
+                            if (!prim.Address) { DrawPoly(ScreenPoints, ValidCount); ValidCount = 0; continue; }
                             ImVec2 ScreenPos;
-                            if (!W2S(part.primitive().position(), ScreenPos)) { DrawPoly(ScreenPoints, ValidCount); ValidCount = 0; continue; }
+                            if (!W2S(prim.position(), ScreenPos)) { DrawPoly(ScreenPoints, ValidCount); ValidCount = 0; continue; }
                             ScreenPoints[ValidCount++] = ScreenPos;
                         }
                         DrawPoly(ScreenPoints, ValidCount);
@@ -1097,6 +1131,11 @@ namespace esp {
                     sdk::part HeadPart(player.Head.Address);
                     const auto& TorsoPrim = TorsoPart.primitive();
                     const auto& HeadPrim = HeadPart.primitive();
+                    
+                    // Null safety: ensure primitives are valid
+                    if (!TorsoPrim.Address || !HeadPrim.Address)
+                        continue;
+                    
                     const sdk::vector3 TorsoPos = TorsoPrim.position();
                     const sdk::vector3 TorsoSize = TorsoPrim.size();
                     const auto TorsoRot = TorsoPrim.rotation();
@@ -1159,5 +1198,231 @@ namespace esp {
 
         style::VisibilityTint = false;
 
+    }
+}
+
+// ── Crosshair (ported from omc0eg) ───────────────────────────────────────────
+
+static ImVec2 xhair_rotate(ImVec2 center, ImVec2 point, float angle) {
+    float ca = cosf(angle), sa = sinf(angle);
+    float dx = point.x - center.x, dy = point.y - center.y;
+    return { center.x + dx*ca - dy*sa, center.y + dx*sa + dy*ca };
+}
+
+static float xhair_anim_rot(float t) {
+    // 5-second cycle: sweeps 0→105°→90°→-25°→0°
+    float t1 = 5.f, t2 = fmodf(t, t1) / t1;
+    const float pi = 3.14159f;
+    auto d2r = [&](float d){ return d * pi / 180.f; };
+    float t90=d2r(90.f), pos=d2r(105.f), neg=d2r(-25.f);
+    if      (t2 < 0.3f)  { float r=t2/0.3f;        return 0.5f*(1.f-cosf(r*pi))*pos; }
+    else if (t2 < 0.4f)  { float r=(t2-0.3f)/0.1f; return pos*(1.f-0.5f*(1.f-cosf(r*pi))) + t90*0.5f*(1.f-cosf(r*pi)); }
+    else if (t2 < 0.5f)  { return t90; }
+    else if (t2 < 0.75f) { float r=(t2-0.5f)/0.25f; return t90*(1.f-0.5f*(1.f-cosf(r*pi))) + neg*0.5f*(1.f-cosf(r*pi)); }
+    else if (t2 < 0.85f) { float r=(t2-0.75f)/0.1f; return neg*(1.f-0.5f*(1.f-cosf(r*pi))); }
+    return 0.f;
+}
+
+static void draw_xhair_line(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float thick, bool outline) {
+    if (outline) dl->AddLine(a, b, IM_COL32(0,0,0,180), thick+2.f);
+    dl->AddLine(a, b, col, thick);
+}
+
+void esp::crosshair(ImDrawList* dl)
+{
+    if (!global::crosshair::Enabled) return;
+
+    ImU32 col = IM_COL32(
+        (int)(global::crosshair::Color[0]*255),
+        (int)(global::crosshair::Color[1]*255),
+        (int)(global::crosshair::Color[2]*255),
+        (int)(global::crosshair::Color[3]*255));
+
+    float curr = (float)ImGui::GetTime();
+    ImVec2 center;
+
+    if (global::crosshair::Position == 0) {
+        // Follow cursor — hide the Windows cursor so the crosshair replaces it
+        static ImVec2 last{-1,-1};
+        POINT m{}; HWND w = FindWindowA(nullptr,"Roblox");
+        if (!w || !GetCursorPos(&m) || !ScreenToClient(w,&m)) return;
+        ImVec2 target{(float)m.x,(float)m.y};
+        if (last.x < 0) last = target;
+        float dt = ImGui::GetIO().DeltaTime;
+        float lf = 1.f - expf(-10.f * dt);
+        last = { last.x+(target.x-last.x)*lf, last.y+(target.y-last.y)*lf };
+        center = last;
+        // Hide Windows cursor when Roblox is focused
+        if (GetForegroundWindow() == w)
+            SetCursor(nullptr);
+    } else {
+        auto sz = ImGui::GetIO().DisplaySize;
+        center = { sz.x*0.5f, sz.y*0.5f };
+    }
+
+    float gap   = global::crosshair::Gap;
+    float size  = global::crosshair::Size;
+    float thick = global::crosshair::Thickness;
+    bool  out   = global::crosshair::Outline;
+
+    float angle = 0.f;
+
+    if (global::crosshair::Type == 1) {
+        // Animated: gap breathes + omc0eg sweep rotation
+        float anim_gap = gap + 0.8f*gap * sinf(0.4f*curr);
+        gap = (std::max)(anim_gap, gap*0.5f);
+        angle = xhair_anim_rot(curr);
+    }
+    else if (global::crosshair::Type == 2) {
+        // Spin: constant rotation at user-defined speed
+        angle = fmodf(curr * global::crosshair::SpinSpeed * 6.2832f, 6.2832f);
+    }
+
+    float hg = gap*0.5f;
+    ImVec2 l1s{center.x-hg-size, center.y}, l1e{center.x-hg, center.y};
+    ImVec2 l2s{center.x, center.y+hg+size}, l2e{center.x, center.y+hg};
+    ImVec2 l3s{center.x+hg+size, center.y}, l3e{center.x+hg, center.y};
+    ImVec2 l4s{center.x, center.y-hg-size}, l4e{center.x, center.y-hg};
+
+    // Apply rotation for Animated and Spin types
+    if (angle != 0.f) {
+        l1s=xhair_rotate(center,l1s,angle); l1e=xhair_rotate(center,l1e,angle);
+        l2s=xhair_rotate(center,l2s,angle); l2e=xhair_rotate(center,l2e,angle);
+        l3s=xhair_rotate(center,l3s,angle); l3e=xhair_rotate(center,l3e,angle);
+        l4s=xhair_rotate(center,l4s,angle); l4e=xhair_rotate(center,l4e,angle);
+    }
+
+    draw_xhair_line(dl,l1s,l1e,col,thick,out);
+    draw_xhair_line(dl,l2s,l2e,col,thick,out);
+    draw_xhair_line(dl,l3s,l3e,col,thick,out);
+    draw_xhair_line(dl,l4s,l4e,col,thick,out);
+}
+
+// ── Tracers / Snaplines (ported from omc0eg) ──────────────────────────────────
+
+void esp::tracers(ImDrawList* dl, const std::vector<sdk::player>& players)
+{
+    if (!global::tracer::Enabled) return;
+
+    ImU32 col = IM_COL32(
+        (int)(global::tracer::Color[0]*255),
+        (int)(global::tracer::Color[1]*255),
+        (int)(global::tracer::Color[2]*255),
+        (int)(global::tracer::Color[3]*255));
+
+    ImVec2 disp = ImGui::GetIO().DisplaySize;
+
+    // Determine origin
+    ImVec2 origin{};
+    switch (global::tracer::Origin) {
+        case 0: { // cursor
+            POINT m{}; HWND w=FindWindowA(nullptr,"Roblox");
+            if (!w||!GetCursorPos(&m)||!ScreenToClient(w,&m)) return;
+            origin={float(m.x),float(m.y)}; break;
+        }
+        case 1: origin={disp.x*0.5f, disp.y*0.5f}; break;
+        case 2: origin={disp.x*0.5f, 0.f}; break;
+        case 3: origin={disp.x*0.5f, disp.y}; break;
+        case 4: { // local head
+            if (!global::LocalPlayer.Head.Address) return;
+            sdk::part p(global::LocalPlayer.Head.Address);
+            sdk::vector2 s = global::render.screen(p.partposition());
+            if (s.x<0||s.y<0) return;
+            origin={s.x,s.y}; break;
+        }
+        case 5: { // local hrp
+            if (!global::LocalPlayer.HumanoidRootPart.Address) return;
+            sdk::part p(global::LocalPlayer.HumanoidRootPart.Address);
+            sdk::vector2 s = global::render.screen(p.partposition());
+            if (s.x<0||s.y<0) return;
+            origin={s.x,s.y}; break;
+        }
+    }
+
+    float thick = global::tracer::Thickness;
+    bool  out   = global::tracer::Outline;
+
+    for (auto& player : players) {
+        if (!player.character.Address) continue;
+        if (player.Local_Player && !global::esp::Local_Player) continue;
+        if (global::esp::Dead_Check && player.Health <= 0.f) continue;
+
+        // Determine destination
+        ImVec2 dest{};
+        bool   found = false;
+
+        auto get_screen = [&](const sdk::instance& inst) -> ImVec2 {
+            if (!inst.Address) return {-1,-1};
+            sdk::part p(inst.Address);
+            sdk::vector2 s = global::render.screen(p.partposition());
+            if (s.x < 0 || s.y < 0) return {-1,-1};
+            return {s.x,s.y};
+        };
+
+        switch (global::tracer::Dest) {
+            case 0: { auto s=get_screen(player.Head);                if(s.x>=0){dest=s;found=true;} break; }
+            case 1: { auto s=get_screen(player.HumanoidRootPart);    if(s.x>=0){dest=s;found=true;} break; }
+            case 2: { // closest part to origin
+                float best=FLT_MAX;
+                auto try_part=[&](const sdk::instance& inst){
+                    auto s=get_screen(inst); if(s.x<0)return;
+                    float dx=s.x-origin.x,dy=s.y-origin.y;
+                    float d=dx*dx+dy*dy;
+                    if(d<best){best=d;dest=s;found=true;}
+                };
+                try_part(player.Head); try_part(player.HumanoidRootPart);
+                try_part(player.UpperTorso); try_part(player.Torso);
+                break;
+            }
+            case 3: { // My Head — line goes FROM local head TO enemy head, like a cursor-follow tracer
+                if (global::LocalPlayer.Head.Address) {
+                    sdk::part lhp(global::LocalPlayer.Head.Address);
+                    sdk::vector2 ls = global::render.screen(lhp.partposition());
+                    if (ls.x >= 0) { origin = {ls.x, ls.y}; }
+                }
+                auto s=get_screen(player.Head); if(s.x>=0){dest=s;found=true;}
+                break;
+            }
+        }
+        if (!found) continue;
+
+        // Draw by style
+        switch (global::tracer::Style) {
+            case 0: { // straight
+                if (out) dl->AddLine(origin,dest,IM_COL32(0,0,0,160),thick+2.f);
+                dl->AddLine(origin,dest,col,thick);
+                break;
+            }
+            case 1: { // curved bezier
+                ImVec2 ctrl{(origin.x+dest.x)*0.5f, (origin.y+dest.y)*0.5f+180.f};
+                const int seg=24;
+                ImVec2 prev=origin;
+                for (int i=1;i<=seg;i++) {
+                    float t=(float)i/seg, it=1.f-t;
+                    ImVec2 pt{
+                        it*it*origin.x + 2*it*t*ctrl.x + t*t*dest.x,
+                        it*it*origin.y + 2*it*t*ctrl.y + t*t*dest.y };
+                    if (out) dl->AddLine(prev,pt,IM_COL32(0,0,0,160),thick+2.f);
+                    dl->AddLine(prev,pt,col,thick);
+                    prev=pt;
+                }
+                break;
+            }
+            case 2: { // dashed
+                float dx=dest.x-origin.x, dy=dest.y-origin.y;
+                float len=sqrtf(dx*dx+dy*dy);
+                if(len<0.01f) break;
+                ImVec2 dir{dx/len,dy/len};
+                float dash=len/20.f;
+                for(int i=0;i<10;i++){
+                    float s=i*2.f*dash, e=s+dash;
+                    ImVec2 ps{origin.x+dir.x*s, origin.y+dir.y*s};
+                    ImVec2 pe{origin.x+dir.x*e, origin.y+dir.y*e};
+                    if (out) dl->AddLine(ps,pe,IM_COL32(0,0,0,160),thick+2.f);
+                    dl->AddLine(ps,pe,col,thick);
+                }
+                break;
+            }
+        }
     }
 }

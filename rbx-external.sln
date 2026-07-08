@@ -5,6 +5,11 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rbx-external", "rbx-external.vcxproj", "{A2EA39BC-CBF5-432B-858E-8FC43D687C55}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UWLoader", "UWLoader\UWLoader.vcxproj", "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A2EA39BC-CBF5-432B-858E-8FC43D687C55} = {A2EA39BC-CBF5-432B-858E-8FC43D687C55}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -15,5 +20,9 @@ Global
 		{A2EA39BC-CBF5-432B-858E-8FC43D687C55}.Debug|x64.Build.0 = Debug|x64
 		{A2EA39BC-CBF5-432B-858E-8FC43D687C55}.Release|x64.ActiveCfg = Release|x64
 		{A2EA39BC-CBF5-432B-858E-8FC43D687C55}.Release|x64.Build.0 = Release|x64
+		{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}.Debug|x64.ActiveCfg = Release|x64
+		{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}.Debug|x64.Build.0 = Release|x64
+		{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}.Release|x64.ActiveCfg = Release|x64
+		{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal
