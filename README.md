@@ -1,3 +1,5 @@
+# if you paid for this anywhere other than vacban, sorry but you got scammed, the one and only real person is: @n1kvz - discord canteen_eater123 - vacban
+
 #either go to the build folder or go to release, my main cfg is in the release
 
 # credits to Autopsy.lol for the source
