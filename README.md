@@ -1,4 +1,4 @@
-#either go to the build folder or go to release, my main cfg is in the release cfg
+#either go to the build folder or go to release, my main cfg is in the release
 
 # credits to Autopsy.lol for the source
 uh idk its open source do wtv u fucking want w it
