@@ -1,4 +1,4 @@
-# use the release before v2, for some reason v2 is fucked!
+# use the release before v2, for some reason v2 is fucked! v2.2 is being worked on atm
 
 if you paid for this anywhere other than vacban, sorry but you got scammed, the one and only real person is: @n1kvz - discord canteen_eater123 - vacban
 
