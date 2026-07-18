@@ -2540,6 +2540,100 @@ void graphic::menu()
 {
     color::refresh();
 
+    // ── Discord gate — must confirm before accessing menu ─────────────────────
+    if (!discord_confirmed)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+
+        // Full-screen opaque window that captures all input
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(io.DisplaySize);
+        ImGui::SetNextWindowBgAlpha(0.92f);
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.04f, 0.04f, 0.07f, 1.f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+        ImGui::Begin("##discord_gate_window", nullptr,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+        ImDrawList* dl  = ImGui::GetWindowDrawList();
+        ImVec2 disp     = io.DisplaySize;
+        ImVec2 center   = ImVec2(disp.x * 0.5f, disp.y * 0.5f);
+
+        const float CW = 420.f, CH = 230.f;
+        ImVec2 cMin = ImVec2(center.x - CW * 0.5f, center.y - CH * 0.5f);
+        ImVec2 cMax = ImVec2(center.x + CW * 0.5f, center.y + CH * 0.5f);
+
+        // Card
+        dl->AddRectFilled(cMin, cMax, IM_COL32(14,14,22,255), 12.f);
+        dl->AddRect(cMin, cMax, IM_COL32(255,255,255,22), 12.f, 0, 1.f);
+        dl->AddRectFilled(cMin + ImVec2(14.f,0), cMin + ImVec2(CW-14.f, 2.5f),
+            IM_COL32(88,101,242,220), 1.f);
+
+        // Icon circle
+        ImVec2 ic = ImVec2(center.x, cMin.y + 44.f);
+        dl->AddCircleFilled(ic, 22.f, IM_COL32(88,101,242,220), 32);
+        ImFont* bf = Tahoma_BoldXP ? Tahoma_BoldXP : ImGui::GetFont();
+        float   bfs = bf->LegacySize;
+        ImVec2  dsz = bf->CalcTextSizeA(bfs, FLT_MAX, 0.f, "D");
+        dl->AddText(bf, bfs, ic - ImVec2(dsz.x*0.5f, dsz.y*0.5f),
+            IM_COL32(255,255,255,255), "D");
+
+        // Title
+        const char* title = "Join our Discord";
+        ImVec2 tsz = bf->CalcTextSizeA(bfs+1.f, FLT_MAX, 0.f, title);
+        dl->AddText(bf, bfs+1.f, ImVec2(center.x - tsz.x*0.5f, cMin.y + 76.f),
+            IM_COL32(230,232,242,245), title);
+
+        // Sub text
+        ImFont* rf  = UiFont ? UiFont : ImGui::GetFont();
+        float   rfs = rf->LegacySize;
+        const char* sub1 = "You must join UW External Discord to use this software.";
+        const char* sub2 = "discord.gg/Bgy7uae9x";
+        ImVec2 s1sz = rf->CalcTextSizeA(rfs, FLT_MAX, 0.f, sub1);
+        ImVec2 s2sz = rf->CalcTextSizeA(rfs, FLT_MAX, 0.f, sub2);
+        dl->AddText(rf, rfs, ImVec2(center.x - s1sz.x*0.5f, cMin.y + 104.f),
+            IM_COL32(150,155,170,210), sub1);
+        dl->AddText(rf, rfs, ImVec2(center.x - s2sz.x*0.5f, cMin.y + 120.f),
+            IM_COL32(88,101,242,220), sub2);
+
+        // Buttons using real ImGui buttons so input works
+        const float BW = 140.f, BH = 32.f, gap = 12.f;
+        float bY = cMax.y - BH - 18.f;
+        float b1X = center.x - BW - gap * 0.5f;
+        float b2X = center.x + gap * 0.5f;
+
+        // Style open discord button (blurple)
+        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.34f,0.40f,0.95f,0.80f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.42f,0.47f,1.00f,0.95f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.25f,0.30f,0.80f,1.00f));
+        ImGui::PushStyleColor(ImGuiCol_Text,          ImVec4(1,1,1,1));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 7.f);
+        ImGui::SetCursorScreenPos(ImVec2(b1X, bY));
+        if (ImGui::Button("Open Discord##dg", ImVec2(BW, BH)))
+            ShellExecuteA(nullptr, "open", "https://discord.gg/Bgy7uae9x",
+                          nullptr, nullptr, SW_SHOWNORMAL);
+        ImGui::PopStyleColor(4);
+        ImGui::PopStyleVar();
+
+        // Style I Joined button (green)
+        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.14f,0.30f,0.05f,0.80f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f,0.45f,0.08f,0.95f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.10f,0.22f,0.03f,1.00f));
+        ImGui::PushStyleColor(ImGuiCol_Text,          ImVec4(0.78f,0.94f,0.63f,1.f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 7.f);
+        ImGui::SetCursorScreenPos(ImVec2(b2X, bY));
+        if (ImGui::Button("I Joined##dg", ImVec2(BW, BH)))
+            discord_confirmed = true;
+        ImGui::PopStyleColor(4);
+        ImGui::PopStyleVar();
+
+        ImGui::End();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(2);
+        return;
+    }
+
     static int Section = 0;
     static int LastSection = 0;
     static float SectionAlpha = 1.f;
@@ -3774,11 +3868,6 @@ void graphic::visual()
     media::render();
     hud::render(Running);
     notify::render();
-    // Discord gate — blocks entire UI until user confirms they joined
-    if (!discord_confirmed) {
-        discord_gate();
-        return;
-    }
     welcome(Running);
 
     // Crosshair + Tracers drawn on foreground
