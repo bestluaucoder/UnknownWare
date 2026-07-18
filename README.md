@@ -1,3 +1,5 @@
+# to update offsets manually open the offsetupdater.bat and rebuild the project.
+
 # if you paid for this anywhere other than vacban, sorry but you got scammed, the one and only real person is: @n1kvz - discord canteen_eater123 - vacban
 
 # how to put configs:
