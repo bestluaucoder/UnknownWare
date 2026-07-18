@@ -2437,49 +2437,54 @@ static void discord_gate()
     // "Open Discord" button (left)
     ImVec2 b1Min = { center.x - totalBW*0.5f,       bY };
     ImVec2 b1Max = { center.x - totalBW*0.5f + BW,  bY + BH };
-    bool   b1Hov = ImGui::IsMouseHoveringRect(b1Min, b1Max);
-    ImU32  b1Col = b1Hov ? IM_COL32(108,121,255,(int)(240*alpha))
-                          : IM_COL32(88,101,242,(int)(200*alpha));
-    dl->AddRectFilled(b1Min, b1Max, b1Col, 7.f);
-    dl->AddRect(b1Min, b1Max, IM_COL32(130,145,255,(int)(120*alpha)), 7.f, 0, 1.f);
-    const char* lbl1 = "Open Discord";
-    ImVec2 l1sz = rf->CalcTextSizeA(rfs, FLT_MAX, 0.f, lbl1);
-    dl->AddText(rf, rfs, b1Min + ImVec2((BW-l1sz.x)*0.5f,(BH-rfs)*0.5f),
-        IM_COL32(255,255,255,(int)(245*alpha)), lbl1);
-
-    if (b1Hov && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-        ShellExecuteA(nullptr, "open", "https://discord.gg/Bgy7uae9x",
-                      nullptr, nullptr, SW_SHOWNORMAL);
 
     // "I Joined ✓" button (right)
-    ImVec2 b2Min = { center.x - totalBW*0.5f + BW + gap,      bY };
-    ImVec2 b2Max = { center.x - totalBW*0.5f + BW*2 + gap,    bY + BH };
-    bool   b2Hov = ImGui::IsMouseHoveringRect(b2Min, b2Max);
-    ImU32  b2Col = b2Hov ? IM_COL32(50,100,22,(int)(240*alpha))
-                          : IM_COL32(36,76,14,(int)(200*alpha));
-    ImU32  b2Brd = b2Hov ? IM_COL32(100,200,40,(int)(200*alpha))
-                          : IM_COL32(70,150,25,(int)(140*alpha));
+    ImVec2 b2Min = { center.x - totalBW*0.5f + BW + gap,   bY };
+    ImVec2 b2Max = { center.x - totalBW*0.5f + BW*2 + gap, bY + BH };
+
+    // Render button backgrounds via drawlist
+    bool b1Hov = ImGui::IsMouseHoveringRect(b1Min, b1Max, false);
+    bool b2Hov = ImGui::IsMouseHoveringRect(b2Min, b2Max, false);
+
+    ImU32 b1Col = b1Hov ? IM_COL32(108,121,255,(int)(240*alpha)) : IM_COL32(88,101,242,(int)(200*alpha));
+    dl->AddRectFilled(b1Min, b1Max, b1Col, 7.f);
+    dl->AddRect(b1Min, b1Max, IM_COL32(130,145,255,(int)(120*alpha)), 7.f, 0, 1.f);
+
+    ImU32 b2Col = b2Hov ? IM_COL32(50,100,22,(int)(240*alpha)) : IM_COL32(36,76,14,(int)(200*alpha));
+    ImU32 b2Brd = b2Hov ? IM_COL32(100,200,40,(int)(200*alpha)) : IM_COL32(70,150,25,(int)(140*alpha));
     dl->AddRectFilled(b2Min, b2Max, b2Col, 7.f);
     dl->AddRect(b2Min, b2Max, b2Brd, 7.f, 0, 1.f);
-    const char* lbl2 = "I Joined  \xE2\x9C\x93";
-    ImVec2 l2sz = rf->CalcTextSizeA(rfs, FLT_MAX, 0.f, lbl2);
-    dl->AddText(rf, rfs, b2Min + ImVec2((BW-l2sz.x)*0.5f,(BH-rfs)*0.5f),
-        IM_COL32(200,240,160,(int)(245*alpha)), lbl2);
 
-    if (b2Hov && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    const char* lbl1 = "Open Discord";
+    const char* lbl2 = "I Joined";
+    ImVec2 l1sz = rf->CalcTextSizeA(rfs, FLT_MAX, 0.f, lbl1);
+    ImVec2 l2sz = rf->CalcTextSizeA(rfs, FLT_MAX, 0.f, lbl2);
+    dl->AddText(rf, rfs, b1Min + ImVec2((BW-l1sz.x)*0.5f,(BH-rfs)*0.5f), IM_COL32(255,255,255,(int)(245*alpha)), lbl1);
+    dl->AddText(rf, rfs, b2Min + ImVec2((BW-l2sz.x)*0.5f,(BH-rfs)*0.5f), IM_COL32(200,240,160,(int)(245*alpha)), lbl2);
+
+    // Use a transparent full-screen ImGui window to capture clicks properly
+    ImGui::SetNextWindowPos({0.f, 0.f});
+    ImGui::SetNextWindowSize(display);
+    ImGui::SetNextWindowBgAlpha(0.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.f,0.f});
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+    ImGui::Begin("##discord_input", nullptr,
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    // Button 1 — Open Discord
+    ImGui::SetCursorScreenPos(b1Min);
+    if (ImGui::InvisibleButton("##discordbtn", ImVec2(BW, BH)))
+        ShellExecuteA(nullptr, "open", "https://discord.gg/Bgy7uae9x", nullptr, nullptr, SW_SHOWNORMAL);
+
+    // Button 2 — I Joined
+    ImGui::SetCursorScreenPos(b2Min);
+    if (ImGui::InvisibleButton("##joinedbtn", ImVec2(BW, BH)))
         discord_confirmed = true;
 
-    // Block all input to the rest of the UI while gate is showing
-    ImGui::SetNextWindowPos({0,0});
-    ImGui::SetNextWindowSize(display);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0,0,0,0));
-    ImGui::Begin("##discord_blocker", nullptr,
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
-        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav);
     ImGui::End();
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar();
+    ImGui::PopStyleVar(2);
 }
 
 static void welcome(bool menuOpen)
